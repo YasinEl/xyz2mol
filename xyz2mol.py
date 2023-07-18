@@ -53,7 +53,7 @@ atomic_valence[1] = [1]
 atomic_valence[5] = [3,4]
 atomic_valence[6] = [4]
 atomic_valence[7] = [3,4]
-atomic_valence[8] = [2,1,3]
+atomic_valence[8] = [2]
 atomic_valence[9] = [1]
 atomic_valence[14] = [4]
 atomic_valence[15] = [5,3] #[5,4,3]
@@ -79,6 +79,13 @@ atomic_valence_electrons[35] = 7
 atomic_valence_electrons[53] = 7
 
 
+
+def mol_with_atom_index(mol):
+    atoms = mol.GetNumAtoms()
+    for idx in range(atoms):
+        mol.GetAtomWithIdx(idx).SetProp('molAtomMapNumber', str(mol.GetAtomWithIdx(idx).GetIdx()))
+    return mol
+
 def str_atom(atom):
     """
     convert integer atom to string atom
@@ -98,7 +105,7 @@ def int_atom(atom):
     return __ATOM_LIST__.index(atom) + 1
 
 
-def get_UA(maxValence_list, valence_list):
+def get_UA(maxValence_list, valence_list): #we have to return the version where O has to lowest number of bonds (rather 2 than 3)
     """
     """
     UA = []
@@ -110,22 +117,55 @@ def get_UA(maxValence_list, valence_list):
         DU.append(maxValence - valence)
     return UA, DU
 
+from collections import Counter
+from itertools import combinations
+def find_combinations(UA, UA_pairs, DU):
+    results = []
+    DU_dict = dict(zip(UA, DU))
+    min_diff = float('inf')  # Start with infinity as the minimum difference
+    min_applied_UA_diff = float('inf')
+
+    for r in range(1, len(UA_pairs) + 1):
+        for subset in combinations(UA_pairs, r):
+            flat_subset = [i for sub in subset for i in sub]
+            counter = Counter(flat_subset)
+
+            # Calculate the overall difference
+            diff = sum(abs(DU_dict.get(i, 0) - counter[i]) for i in counter)
+            applied_UA_diff = abs(sum(DU_dict.get(i, 0) for i in counter) - sum(DU))
+
+            # Update the minimum difference
+
+            min_diff = min(min_diff, diff)
+
+            # Store the difference together with the subset
+            results.append((diff, applied_UA_diff, list(subset)))
+
+    #results_min_diff = [results for diff, applied_UA_diff, subset in results if diff == min_diff]
+    results_min_diff = [t for t in results if t[0] == min_diff]
+
+    min_applied_UA_diff = min(t[1] for t in results_min_diff)
+    summary = [t[2] for t in results_min_diff if t[1] == min_applied_UA_diff]
+    #summary = [results_min_diff for diff, subset in results_min_diff if diff == min_diff]
+    # Return only the combinations with the minimum difference
+    return summary[0]
+
 
 def get_BO(AC, UA, DU, valences, UA_pairs, use_graph=True):
     """
     """
     BO = AC.copy()
     DU_save = []
-
-    while DU_save != DU:
-        for i, j in UA_pairs:
+    for UA_pair in UA_pairs:
+    #while DU_save == []:#DU:
+        for i, j in UA_pair:
             BO[i, j] += 1
             BO[j, i] += 1
 
-        BO_valence = list(BO.sum(axis=1))
-        DU_save = copy.copy(DU)
-        UA, DU = get_UA(valences, BO_valence)
-        UA_pairs = get_UA_pairs(UA, AC, use_graph=use_graph)[0]
+        #BO_valence = list(BO.sum(axis=1))
+        #DU_save = copy.copy(DU)
+        #UA, DU = get_UA(valences, BO_valence)
+        #UA_pairs = get_UA_pairs(UA, AC, use_graph=use_graph)[0]
 
     return BO
 
@@ -152,7 +192,7 @@ def charge_is_OK(BO, AC, charge, DU, atomic_valence_electrons, atoms, valences,
 
         BO_valences = list(BO.sum(axis=1))
         for i, atom in enumerate(atoms):
-            q = get_atomic_charge(atom, atomic_valence_electrons[atom], BO_valences[i])
+            q, radical = get_atomic_charge(atom, atomic_valence_electrons[atom], BO_valences[i])
             Q += q
             if atom == 6:
                 number_of_single_bonds_to_C = list(BO[i, :]).count(1)
@@ -204,11 +244,15 @@ def BO_is_OK(BO, AC, charge, DU, atomic_valence_electrons, atoms, valences,
 def get_atomic_charge(atom, atomic_valence_electrons, BO_valence):
     """
     """
+    radical = False
 
     if atom == 1:
         charge = 1 - BO_valence
     elif atom == 5:
         charge = 3 - BO_valence
+    elif atom == 7 and BO_valence == 2:
+        charge = 1
+        radical = True
     elif atom == 15 and BO_valence == 5:
         charge = 0
     elif atom == 16 and BO_valence == 6:
@@ -216,7 +260,7 @@ def get_atomic_charge(atom, atomic_valence_electrons, BO_valence):
     else:
         charge = atomic_valence_electrons - 8 + BO_valence
 
-    return charge
+    return charge, radical
 
 
 def clean_charges(mol):
@@ -288,6 +332,7 @@ def BO2mol(mol, BO_matrix, atoms, atomic_valence_electrons,
 
     rwMol = Chem.RWMol(mol)
 
+
     bondTypeDict = {
         1: Chem.BondType.SINGLE,
         2: Chem.BondType.DOUBLE,
@@ -303,6 +348,7 @@ def BO2mol(mol, BO_matrix, atoms, atomic_valence_electrons,
             rwMol.AddBond(i, j, bt)
 
     mol = rwMol.GetMol()
+
 
     if allow_charged_fragments:
         mol = set_atomic_charges(
@@ -330,7 +376,8 @@ def set_atomic_charges(mol, atoms, atomic_valence_electrons,
         a = mol.GetAtomWithIdx(i)
         if use_atom_maps:
             a.SetAtomMapNum(i+1)
-        charge = get_atomic_charge(atom, atomic_valence_electrons[atom], BO_valences[i])
+        charge, radical = get_atomic_charge(atom, atomic_valence_electrons[atom], BO_valences[i])
+
         q += charge
         if atom == 6:
             number_of_single_bonds_to_C = list(BO_matrix[i, :]).count(1)
@@ -340,10 +387,16 @@ def set_atomic_charges(mol, atoms, atomic_valence_electrons,
             if number_of_single_bonds_to_C == 3 and q + 1 < mol_charge:
                 q += 2
                 charge = 1
+            if BO_matrix[i, :].sum() == 3:
+                charge = 1
+            if charge == -1:
+                pass
 
-        if (abs(charge) > 0):
+        if (abs(charge) > 0 and radical == False):
             a.SetFormalCharge(int(charge))
-
+        if (abs(charge) > 0 and radical == True):
+            a.SetFormalCharge(int(charge))
+            a.SetNumRadicalElectrons(int(atomic_valence_electrons[atom] - BO_valences[i] - charge))
     #mol = clean_charges(mol)
 
     return mol
@@ -399,7 +452,23 @@ def get_UA_pairs(UA, AC, use_graph=True):
         G = nx.Graph()
         G.add_edges_from(bonds)
         UA_pairs = [list(nx.max_weight_matching(G))]
-        return UA_pairs
+
+        #Get conjugated atoms
+        components = nx.connected_components(G)
+
+        # Initialize an empty list to store the connections for each conjugated system
+        component_edges = []
+
+        # Iterate over the bonds
+        for component in components:
+            # Create a subgraph for the current component
+            subgraph = G.subgraph(component)
+            # Get the bonds of the subgraph and append to the list
+            component_edges.append(list(subgraph.edges()))
+
+
+
+        return component_edges
 
     max_atoms_in_combo = 0
     UA_pairs = [()]
@@ -415,6 +484,20 @@ def get_UA_pairs(UA, AC, use_graph=True):
 
     return UA_pairs
 
+def is_nested_list(lst):
+    return isinstance(lst, list) and any(isinstance(i, list) for i in lst)
+
+def process_pairs(UA_pairs_list_raw, UA, DU_from_AC):
+    UA_pairs_list = []
+    for conjugated_bond_cluster in UA_pairs_list_raw:
+        if len(conjugated_bond_cluster) < 2:
+            UA_pairs_list.extend([conjugated_bond_cluster[0]])
+        elif len(conjugated_bond_cluster) > 1:
+            UA_pairs_list.extend(find_combinations(UA, conjugated_bond_cluster, DU_from_AC))
+    pass
+    UA_pairs_list = [[item] for item in UA_pairs_list]
+
+    return UA_pairs_list
 
 def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
     """
@@ -428,24 +511,49 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
     best_BO: Bcurr in Figure
 
     """
+    AC_save = AC.copy()
 
     global atomic_valence
     global atomic_valence_electrons
+    reps = 1
 
-    # make a list of valences, e.g. for CO: [[4],[2,1]]
-    valences_list_of_lists = []
-    AC_valence = list(AC.sum(axis=1))
-    
-    for i,(atomicNum,valence) in enumerate(zip(atoms,AC_valence)):
-        # valence can't be smaller than number of neighbourgs
-        possible_valence = [x for x in atomic_valence[atomicNum] if x >= valence]
-        if not possible_valence:
-            print('Valence of atom',i,'is',valence,'which bigger than allowed max',max(atomic_valence[atomicNum]),'. Stopping')
-            sys.exit()
-        valences_list_of_lists.append(possible_valence)
+    attempt_to_keep_bonds = np.any(AC_save == 2)
+    if attempt_to_keep_bonds == True:
+        reps = 2
 
-    # convert [[4],[2,1]] to [[4,2],[4,1]]
-    valences_list = itertools.product(*valences_list_of_lists)
+    remove_attempted_bonds = False
+    valence_valid = False
+
+    for try_con in range(reps):
+        AC = AC_save.copy()
+        if attempt_to_keep_bonds:
+            if remove_attempted_bonds == False:
+                AC[AC == 2] = 1
+            if remove_attempted_bonds == True:
+                AC[AC == 2] = 0
+
+        # make a list of valences, e.g. for CO: [[4],[2,1]]
+        valences_list_of_lists = []
+        AC_valence = list(AC.sum(axis=1))
+
+        for i,(atomicNum,valence) in enumerate(zip(atoms,AC_valence)):
+            # valence can't be smaller than number of neighbourgs
+            possible_valence = [x for x in atomic_valence[atomicNum] if x >= valence]
+            if not possible_valence:
+                if attempt_to_keep_bonds == False:
+                    print('Valence of atom',i,'is',valence,'which bigger than allowed max',max(atomic_valence[atomicNum]),'. Stopping')
+                    sys.exit()
+                if attempt_to_keep_bonds == True:
+                    remove_attempted_bonds = True
+                    break
+            valences_list_of_lists.append(possible_valence)
+            if i == len(atoms)-1:
+                valence_valid = True
+
+        # convert [[4],[2,1]] to [[4,2],[4,1]]
+        valences_list = itertools.product(*valences_list_of_lists)
+        if valence_valid == True:
+            break
 
     best_BO = AC.copy()
 
@@ -453,7 +561,8 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
 
         UA, DU_from_AC = get_UA(valences, AC_valence)
 
-        check_len = (len(UA) == 0)
+        #check_len gives whether there are any unsaturated atoms
+        check_len = (len(UA) != 0)
         if check_len:
             check_bo = BO_is_OK(AC, AC, charge, DU_from_AC,
                 atomic_valence_electrons, atoms, valences,
@@ -464,21 +573,25 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
         if check_len and check_bo:
             return AC, atomic_valence_electrons
 
-        UA_pairs_list = get_UA_pairs(UA, AC, use_graph=use_graph)
-        for UA_pairs in UA_pairs_list:
-            BO = get_BO(AC, UA, DU_from_AC, valences, UA_pairs, use_graph=use_graph)
-            status = BO_is_OK(BO, AC, charge, DU_from_AC,
-                        atomic_valence_electrons, atoms, valences,
-                        allow_charged_fragments=allow_charged_fragments)
-            charge_OK = charge_is_OK(BO, AC, charge, DU_from_AC, atomic_valence_electrons, atoms, valences,
-                                     allow_charged_fragments=allow_charged_fragments)
+    UA_pairs_list_raw = get_UA_pairs(UA, AC, use_graph=use_graph)
+    UA_pairs_list = process_pairs(UA_pairs_list_raw, UA, DU_from_AC)
 
-            if status:
-                return BO, atomic_valence_electrons
-            elif BO.sum() >= best_BO.sum() and valences_not_too_large(BO, valences) and charge_OK:
-                best_BO = BO.copy()
+    for UA_pairs in [UA_pairs_list]:
+        BO = get_BO(AC, UA, DU_from_AC, valences, UA_pairs, use_graph=use_graph)
+        #status = BO_is_OK(BO, AC, charge, DU_from_AC,
+        #            atomic_valence_electrons, atoms, valences,
+        #            allow_charged_fragments=allow_charged_fragments)
+        #charge_OK = charge_is_OK(BO, AC, charge, DU_from_AC, atomic_valence_electrons, atoms, valences,
+        #                         allow_charged_fragments=allow_charged_fragments)
 
-    return best_BO, atomic_valence_electrons
+        best_BO = BO
+        #if status:
+            #    print(BO)
+            #    return BO, atomic_valence_electrons, AC
+            #elif BO.sum() >= best_BO.sum() and valences_not_too_large(BO, valences) and charge_OK:
+            #                        best_BO = BO.copy()
+
+    return best_BO, atomic_valence_electrons, AC
 
 
 def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True, 
@@ -487,7 +600,7 @@ def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True,
     """
 
     # convert AC matrix to bond order (BO) matrix
-    BO, atomic_valence_electrons = AC2BO(
+    BO, atomic_valence_electrons, AC = AC2BO(
         AC,
         atoms,
         charge,
@@ -504,15 +617,38 @@ def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True,
         allow_charged_fragments=allow_charged_fragments,
         use_atom_maps=use_atom_maps)
 
+    #print('After BO2mol ' + Chem.MolToSmiles(mol))
     # If charge is not correct don't return mol
-    if Chem.GetFormalCharge(mol) != charge:
-        return []
+    #if Chem.GetFormalCharge(mol) != charge:
+    #    return []
 
     # BO2mol returns an arbitrary resonance form. Let's make the rest
     mols = rdchem.ResonanceMolSupplier(mol, Chem.UNCONSTRAINED_CATIONS, Chem.UNCONSTRAINED_ANIONS)
+
+
     mols = [mol for mol in mols]
 
-    return mols
+    #from rdkit.Chem import Draw
+    #from rdkit.Chem.Draw import rdMolDraw2D
+    #import matplotlib.pyplot as plt
+    #import io
+    #from PIL import Image
+    #m = Chem.MolToSmiles(mol)
+    #mol_with_idx = mol_with_atom_index(Chem.MolFromSmiles(m))
+
+    # Generate a 2D depiction of the molecule with indices
+    #drawer = rdMolDraw2D.MolDraw2DCairo(1500, 1500)  # or MolDraw2DSVG to get SVG output
+    #rdMolDraw2D.PrepareAndDrawMolecule(drawer, mol_with_idx)
+    #drawer.FinishDrawing()
+
+    # Get the PNG data
+    #png = drawer.GetDrawingText()
+
+    # Write the PNG data to a file
+    #with open('molecule.png', 'wb') as f:
+    #    f.write(png)
+
+    return mols, AC
 
 
 def get_proto_mol(atoms):
@@ -556,7 +692,7 @@ def read_xyz_file(filename, look_for_charge=True):
     return atoms, charge, xyz_coordinates
 
 
-def xyz2AC(atoms, xyz, charge, use_huckel=False):
+def xyz2AC(atoms, xyz, charge, use_huckel=False, tr_previous_AC = []):
     """
 
     atoms and coordinates to atom connectivity (AC)
@@ -578,10 +714,10 @@ def xyz2AC(atoms, xyz, charge, use_huckel=False):
     if use_huckel:
         return xyz2AC_huckel(atoms, xyz, charge)
     else:
-        return xyz2AC_vdW(atoms, xyz)
+        return xyz2AC_vdW(atoms, xyz, tr_previous_AC)
 
 
-def xyz2AC_vdW(atoms, xyz):
+def xyz2AC_vdW(atoms, xyz, tr_previous_AC = []):
 
     # Get mol template
     mol = get_proto_mol(atoms)
@@ -592,12 +728,12 @@ def xyz2AC_vdW(atoms, xyz):
         conf.SetAtomPosition(i, (xyz[i][0], xyz[i][1], xyz[i][2]))
     mol.AddConformer(conf)
 
-    AC = get_AC(mol)
+    AC = get_AC(mol, covalent_factor = 1.40, tr_previous_AC = tr_previous_AC)
 
     return AC, mol
 
 
-def get_AC(mol, covalent_factor=1.3):
+def get_AC(mol, covalent_factor=1.3, tr_previous_AC = []):
     """
 
     Generate adjacent matrix from atoms and coordinates.
@@ -617,7 +753,6 @@ def get_AC(mol, covalent_factor=1.3):
         AC - adjacent matrix
 
     """
-
     # Calculate distance matrix
     dMat = Chem.Get3DDistanceMatrix(mol)
 
@@ -634,6 +769,25 @@ def get_AC(mol, covalent_factor=1.3):
             if dMat[i, j] <= Rcov_i + Rcov_j:
                 AC[i, j] = 1
                 AC[j, i] = 1
+            elif len(tr_previous_AC) > 0:
+                if tr_previous_AC[i, j] > 0 and dMat[i, j] <= (Rcov_i + Rcov_j) * 2:
+                    AC[i, j] = 2
+                    AC[j, i] = 2
+
+            if AC[i, j] > 0:
+                # Check if total bonds for atom i is exceeded
+                if np.count_nonzero(AC[i, :]) > atomic_valence_electrons[a_i.GetAtomicNum()]:
+                    # Find the bond with the highest distance and remove it
+                    max_dist_j = np.argmax(dMat[i, :] * AC[i, :])
+                    AC[i, max_dist_j] = 0
+                    AC[max_dist_j, i] = 0
+
+                    # Check if total bonds for atom j is exceeded
+                if np.count_nonzero(AC[j, :]) > atomic_valence_electrons[a_j.GetAtomicNum()]:
+                    # Find the bond with the highest distance and remove it
+                    max_dist_i = np.argmax(dMat[j, :] * AC[j, :])
+                    AC[j, max_dist_i] = 0
+                    AC[max_dist_i, j] = 0
 
     return AC
 
@@ -696,7 +850,7 @@ def chiral_stereo_check(mol):
 
 def xyz2mol(atoms, coordinates, charge=0, allow_charged_fragments=True,
             use_graph=True, use_huckel=False, embed_chiral=True,
-            use_atom_maps=False):
+            use_atom_maps=False, tr_previous_AC = []):
     """
     Generate a rdkit molobj from atoms, coordinates and a total_charge.
 
@@ -718,11 +872,11 @@ def xyz2mol(atoms, coordinates, charge=0, allow_charged_fragments=True,
 
     # Get atom connectivity (AC) matrix, list of atomic numbers, molecular charge,
     # and mol object with no connectivity information
-    AC, mol = xyz2AC(atoms, coordinates, charge, use_huckel=use_huckel)
+    AC, mol = xyz2AC(atoms, coordinates, charge, use_huckel=use_huckel, tr_previous_AC=tr_previous_AC)
 
     # Convert AC to bond order matrix and add connectivity and charge info to
     # mol object
-    new_mols = AC2mol(mol, AC, atoms, charge,
+    new_mols, AC = AC2mol(mol, AC, atoms, charge,
                      allow_charged_fragments=allow_charged_fragments,
                      use_graph=use_graph,
                      use_atom_maps=use_atom_maps)
@@ -732,7 +886,7 @@ def xyz2mol(atoms, coordinates, charge=0, allow_charged_fragments=True,
         for new_mol in new_mols:
             chiral_stereo_check(new_mol)
 
-    return new_mols
+    return new_mols, AC
 
 
 def main():
