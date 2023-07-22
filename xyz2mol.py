@@ -21,7 +21,8 @@ try:
 except ImportError:
     rdEHTTools = None
     
-from collections import defaultdict
+from collections import defaultdict, Counter
+from itertools import combinations
 
 import numpy as np
 import networkx as nx
@@ -47,6 +48,7 @@ __ATOM_LIST__ = \
 
 global atomic_valence
 global atomic_valence_electrons
+global atomic_electronegativity
 
 atomic_valence = defaultdict(list)
 atomic_valence[1] = [1]
@@ -83,7 +85,7 @@ max_allowed_bonds[1] = [1]
 max_allowed_bonds[5] = [4]
 max_allowed_bonds[6] = [4]
 max_allowed_bonds[7] = [4]
-max_allowed_bonds[8] = [2]
+max_allowed_bonds[8] = [3]
 max_allowed_bonds[9] = [1]
 max_allowed_bonds[14] = [4]
 max_allowed_bonds[15] = [5] #[5,4,3]
@@ -92,6 +94,20 @@ max_allowed_bonds[17] = [1]
 max_allowed_bonds[32] = [4]
 max_allowed_bonds[35] = [1]
 max_allowed_bonds[53] = [1]
+
+atomic_electronegativity = {}
+atomic_electronegativity[1] = 2.2
+atomic_electronegativity[5] = 2.04
+atomic_electronegativity[6] = 2.55
+atomic_electronegativity[7] = 3.04
+atomic_electronegativity[8] = 3.44
+atomic_electronegativity[9] = 3.98
+atomic_electronegativity[14] = 1.90
+atomic_electronegativity[15] = 2.19
+atomic_electronegativity[16] = 2.58
+atomic_electronegativity[17] = 3.16
+atomic_electronegativity[35] = 2.96
+atomic_electronegativity[53] = 2.66
 
 
 def mol_with_atom_index(mol):
@@ -119,72 +135,29 @@ def int_atom(atom):
     return __ATOM_LIST__.index(atom) + 1
 
 
-def get_UA(maxValence_list, valence_list, atomic_valence_electrons): #we have to return the version where O has to lowest number of bonds (rather 2 than 3)
+def get_UA(maxValence_list, valence_list, atomic_valence_electrons, atom_electroNegativiy): #we have to return the version where O has to lowest number of bonds (rather 2 than 3)
     """
     """
     UA = []
     DU = []
     octet_offset = []
-    for i, (maxValence, valence, atom_val) in enumerate(zip(maxValence_list, valence_list, atomic_valence_electrons)):
+    electro_negativity = []
+    for i, (maxValence, valence, atom_val, EN) in enumerate(zip(maxValence_list, valence_list, atomic_valence_electrons, atom_electroNegativiy)):
         if not maxValence - valence > 0:
             continue
         UA.append(i)
         DU.append(maxValence - valence)
         octet_offset.append(atom_val-8+valence)
-    return UA, DU, octet_offset
+        electro_negativity.append(EN)
+    return UA, DU, octet_offset, electro_negativity
 
-from collections import Counter
-from itertools import combinations
-def find_combinations_old(UA, UA_pairs, DU, octet_offset):
+
+
+def find_combinations(UA, UA_pairs, DU, octet_offset, electro_negativity): # need to adapt the feeding function to also submit the cases with only one ulti-bond to determine if double or tripl
     results = []
     DU_dict = dict(zip(UA, DU))
     octet_offset_dict = dict(zip(UA, octet_offset))
-    min_diff = float('inf')
-    min_octetOffset_count = int(1000)
-    min_octetOffset_max = int(1000)
-    # Start with infinity as the minimum difference
-    min_applied_UA_diff = float('inf')
-
-    for r in range(1, len(UA_pairs) + 1):
-        for subset in combinations(UA_pairs, r):
-            flat_subset = [i for sub in subset for i in sub]
-            counter = Counter(flat_subset)
-
-            # Calculate the overall difference
-            diff = sum(abs(DU_dict.get(i, 0) - counter[i]) for i in counter)
-
-            #Calculate charge
-            #charge_sum = sum(abs(AtCh_dict.get(i, 0) for i in counter)
-            octet_offset_count = sum(octet_offset_dict[i] for i in counter if i in octet_offset_dict and octet_offset_dict[i] != 0)
-            octet_offset_min = min(abs(octet_offset_dict[i]) for i in counter if i in octet_offset_dict)
-
-            applied_UA_diff = sum(abs(DU_dict.get(i, 0) - DU[i]) for i in counter)
-
-            # Update the minimum difference
-            min_diff = min(min_diff, diff)
-            min_octetOffset_count = min(min_octetOffset_count, octet_offset_count)
-            min_octet_offset_min = min(min_octetOffset_max, octet_offset_min)
-
-            # Store the difference together with the subset
-            results.append((diff, applied_UA_diff, octet_offset_count, octet_offset_min, list(subset)))
-
-    #results_min_diff = [results for diff, applied_UA_diff, subset in results if diff == min_diff]
-    results_min_diff = [t for t in results if t[2] == min_octetOffset_count]
-
-    min_applied_UA_diff = min(t[1] for t in results_min_diff) #probably not needed
-    #summary = [t[4] for t in results_min_diff if t[1] == min_applied_UA_diff and t[0] == min_diff]
-    summary = [t[4] for t in results if t[2] == min_octetOffset_count]
-
-    #summary = [t for t in results_min_diff if t[1] == min_applied_UA_diff]
-    #summary = [results_min_diff[4] for diff, applied_UA_diff, charged_count, charge_max, subset in results_min_diff if diff == min_diff]
-    # Return only the combinations with the minimum difference
-    return summary
-
-
-def find_combinations(UA, UA_pairs, DU, octet_offset): # need to adapt the feeding function to also submit the cases with only one ulti-bond to determine if double or tripl
-    results = []
-    DU_dict = dict(zip(UA, DU))
-    octet_offset_dict = dict(zip(UA, octet_offset))
+    electro_negativity_dict = dict(zip(UA, electro_negativity))
 
     # Create a set of keys that appear in UA_pair
     keys_in_UA_pair = set()
@@ -201,6 +174,10 @@ def find_combinations(UA, UA_pairs, DU, octet_offset): # need to adapt the feedi
         if key not in keys_in_UA_pair:
             del octet_offset_dict[key]
 
+    # Remove keys not in UA_pair from electro_negativity_dict
+    for key in list(electro_negativity_dict.keys()):
+        if key not in keys_in_UA_pair:
+            del electro_negativity_dict[key]
 
     #new collections
     overallMin_octet_nonZero_offset_atoms_count = float('inf')
@@ -213,13 +190,14 @@ def find_combinations(UA, UA_pairs, DU, octet_offset): # need to adapt the feedi
             counter = Counter(flat_subset)
             UA_pair_subset = {key: 1 for key in UA_pair_subset}
 
-            #check if atoms are still unsaturated or oversaturated which in this case means how many more bonds we would have compared to the maximum number of allowed bonds (e.g. 4 for N) (positive values mean unsaturated)
+            #check if atoms are still unsaturated or oversaturated which in this case means how many more bonds we would have
+            # compared to the maximum number of allowed bonds (e.g. 4 for N) (positive values mean unsaturated)
             new_UA_or_OA = {}
             for key, value in counter.items():
                 diff = DU_dict.get(key, 0) - value
                 new_UA_or_OA[key] = diff
 
-            #at this point we dont allow oversaturation
+            #at this point we dont allow more bonds the maximum allowed number set in beginning (in dict on top of this script)
             any_oversaturated = any(value < 0 for value in new_UA_or_OA.values())
             if any_oversaturated:
                 continue
@@ -233,31 +211,33 @@ def find_combinations(UA, UA_pairs, DU, octet_offset): # need to adapt the feedi
                 new_octet_offset[key] = new_value
 
             #determine potential triple bonds
-            potential_triple_bonds = {}
-            for UA_tuple in UA_pair_subset.keys():
-                potential_triple_bonds[UA_tuple] = float('-inf')  # should not be needed
-
             for UA_tuple in UA_pair_subset.keys():
                 keys_in_tuple = UA_tuple
                 negative_values = [new_octet_offset.get(key, 0) for key in keys_in_tuple if
                                    new_octet_offset.get(key, 0) < 0]
                 if len(negative_values) == 2:
                     UA_pair_subset[UA_tuple] = 2 #triple bonds will be -1
-            pass
-            #potential_triple_bonds = {key: value for key, value in potential_triple_bonds.items() if value != float('-inf')}
-
-            #update new_octet_offset with triple bond consideration
-            #for key, value in new_octet_offset.items():
-            #    #check if potential triple bond
-            #    if any(key in tpl for tpl in potential_triple_bonds):
-            #        new_octet_offset[key] = new_octet_offset[key] + 1
 
             for key in new_octet_offset:
                 for ua_key in UA_pair_subset:
                     if key in ua_key and UA_pair_subset[ua_key] == 2:
                         new_octet_offset[key] += UA_pair_subset[ua_key]
 
-            pass
+            #check if the atoms with the highest electronegativity have the electrons
+            summed_electroneg_UA = 0 #summed electronegativity for unsaturated atoms
+            summed_electroneg_SA = 0 #summed electronegativity for saturated atoms
+
+            for key in new_octet_offset:
+                if new_octet_offset[key] < 0:
+                    summed_electroneg_UA += electro_negativity_dict[key]
+                else:
+                    summed_electroneg_SA += electro_negativity_dict[key]
+
+            summed_electroneg_UA_SA_diff = summed_electroneg_UA - summed_electroneg_SA #when negative the more eletronegative atoms have the electrons
+
+
+
+
             #check for number of atoms that dont satisfy octet and the highest offset. positive values mean that we have more bonds than needed for
             octet_nonZero_offset_atoms_count = 0
             octet_neg_offset_atoms_count = 0 #missing bonds
@@ -281,18 +261,18 @@ def find_combinations(UA, UA_pairs, DU, octet_offset): # need to adapt the feedi
 
 
             # Store the difference together with the subset
-            results.append((octet_nonZero_offset_atoms_count, UA_pair_subset))
+            results.append((octet_nonZero_offset_atoms_count, summed_electroneg_UA_SA_diff, UA_pair_subset))
+
+    #make sure best octet rule saturation is used
+    UA_pairs_satisfying_maxBonds_and_minOctetViolations = [[t] for t in results if t[0] == overallMin_octet_nonZero_offset_atoms_count]
 
 
-    UA_pairs_satisfying_maxBonds_and_minOctetViolations = [[t[1]] for t in results if t[0] == overallMin_octet_nonZero_offset_atoms_count][0]
+    #select the combination where the electronegtivity determines where the electrons should be
+    best_electroneg_diff = min(range(len(UA_pairs_satisfying_maxBonds_and_minOctetViolations)),
+                             key=lambda index: UA_pairs_satisfying_maxBonds_and_minOctetViolations[index][0][1])
 
-    #min_applied_UA_diff = min(t[1] for t in results_min_diff) #probably not needed
-    #summary = [t[4] for t in results_min_diff if t[1] == min_applied_UA_diff and t[0] == min_diff]
-    #summary = [t[4] for t in results if t[2] == min_octetOffset_count]
+    UA_pairs_satisfying_maxBonds_and_minOctetViolations = [UA_pairs_satisfying_maxBonds_and_minOctetViolations[best_electroneg_diff][0][2]]
 
-    #summary = [t for t in results_min_diff if t[1] == min_applied_UA_diff]
-    #summary = [results_min_diff[4] for diff, applied_UA_diff, charged_count, charge_max, subset in results_min_diff if diff == min_diff]
-    # Return only the combinations with the minimum difference
     return UA_pairs_satisfying_maxBonds_and_minOctetViolations
 
 def get_BO(AC, UA, DU, valences, UA_pairs, use_graph=True):
@@ -388,6 +368,8 @@ def get_atomic_charge(atom, atomic_valence_electrons, BO_valence):
         charge = 1 - BO_valence
     elif atom == 5:
         charge = 3 - BO_valence
+    elif atom == 6 and BO_valence == 2:
+        charge = 0
     elif atom == 7 and BO_valence == 2:
         charge = 1
         radical = True
@@ -527,12 +509,12 @@ def set_atomic_charges(mol, atoms, atomic_valence_electrons,
                 charge = 1
             if BO_matrix[i, :].sum() == 3:
                 charge = 1
-            if charge == -1:
-                pass
+            #if charge == -1:
+            #    pass
 
-        if (abs(charge) > 0 and radical == False):
+        if (abs(charge) != 0 and radical == False):
             a.SetFormalCharge(int(charge))
-        if (abs(charge) > 0 and radical == True):
+        if (abs(charge) != 0 and radical == True):
             a.SetFormalCharge(int(charge))
             a.SetNumRadicalElectrons(int(atomic_valence_electrons[atom] - BO_valences[i] - charge))
     #mol = clean_charges(mol)
@@ -625,15 +607,17 @@ def get_UA_pairs(UA, AC, use_graph=True):
 def is_nested_list(lst):
     return isinstance(lst, list) and any(isinstance(i, list) for i in lst)
 
-def process_pairs(UA_pairs_list_raw, UA, DU_from_AC, octet_offset):
+def process_pairs(UA_pairs_list_raw, UA, DU_from_AC, octet_offset, electro_negativity):
     UA_pairs_list = []
-    for conjugated_bond_cluster in UA_pairs_list_raw:
-        #if len(conjugated_bond_cluster) < 2:
-        #    UA_pairs_list.extend([conjugated_bond_cluster[0]])
-        #elif len(conjugated_bond_cluster) > 1:
-        #    UA_pairs_list.extend(find_combinations(UA, conjugated_bond_cluster, DU_from_AC, octet_offset))
-        UA_pairs_list.extend(find_combinations(UA, conjugated_bond_cluster, DU_from_AC, octet_offset))
-
+    #for conjugated_bond_cluster in UA_pairs_list_raw:
+    #    UA_pairs_list.extend(find_combinations(UA, conjugated_bond_cluster, DU_from_AC, octet_offset, electro_negativity))
+    conjugated_bond_cluster = [item for sublist in UA_pairs_list_raw for item in sublist]
+    pass
+    if len(conjugated_bond_cluster) > 0:
+        UA_pairs_list = find_combinations(UA, conjugated_bond_cluster, DU_from_AC, octet_offset, electro_negativity)
+    else:
+        return {}
+    pass
     result_dict = {}
     for ua_dict in UA_pairs_list:
         result_dict.update(ua_dict)
@@ -676,6 +660,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
         # make a list of valences, e.g. for CO: [[4],[2,1]]
         valences_list_of_lists = []
         atom_valenceElectrons = []
+        atom_electroNegativiy = []
         AC_valence = list(AC.sum(axis=1))
 
         for i,(atomicNum,valence) in enumerate(zip(atoms,AC_valence)):
@@ -684,12 +669,15 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
             if not possible_valence:
                 if attempt_to_keep_bonds == False:
                     print('Valence of atom',i,'is',valence,'which bigger than allowed max',max(atomic_valence[atomicNum]),'. Stopping')
-                    sys.exit()
+                    #sys.exit()
+                    return None
                 if attempt_to_keep_bonds == True:
                     remove_attempted_bonds = True
                     break
             valences_list_of_lists.append(possible_valence)
             atom_valenceElectrons.append(atomic_valence_electrons[atomicNum])
+            atom_electroNegativiy.append(atomic_electronegativity[atomicNum])
+
             if i == len(atoms)-1:
                 valence_valid = True
 
@@ -702,10 +690,10 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
             break
 
     for valences in valences_list: #atm just 1 iteration because I use maximum allowed bonds
-        UA, DU_from_AC, octet_offset = get_UA(valences, AC_valence, atom_valenceElectrons)
+        UA, DU_from_AC, octet_offset, electro_negativity = get_UA(valences, AC_valence, atom_valenceElectrons, atom_electroNegativiy)
 
     UA_pairs_list_raw = get_UA_pairs(UA, AC, use_graph=use_graph)
-    UA_pairs = process_pairs(UA_pairs_list_raw, UA, DU_from_AC, octet_offset)
+    UA_pairs = process_pairs(UA_pairs_list_raw, UA, DU_from_AC, octet_offset, electro_negativity)
 
     BO = get_BO(AC, UA, DU_from_AC, valences, UA_pairs, use_graph=use_graph)
 
@@ -736,37 +724,14 @@ def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True,
         allow_charged_fragments=allow_charged_fragments,
         use_atom_maps=use_atom_maps)
 
-    #print('After BO2mol ' + Chem.MolToSmiles(mol))
-    # If charge is not correct don't return mol
-    #if Chem.GetFormalCharge(mol) != charge:
-    #    return []
 
     # BO2mol returns an arbitrary resonance form. Let's make the rest
-    mols = rdchem.ResonanceMolSupplier(mol, Chem.UNCONSTRAINED_CATIONS, Chem.UNCONSTRAINED_ANIONS)
+    flags = rdchem.ResonanceFlags.ALLOW_INCOMPLETE_OCTETS | rdchem.ResonanceFlags.KEKULE_ALL
+    mols = rdchem.ResonanceMolSupplier(mol, flags)
 
+    #mols = rdchem.ResonanceMolSupplier(mol, Chem.UNCONSTRAINED_CATIONS, Chem.UNCONSTRAINED_ANIONS, ALLOW_INCOMPLETE_OCTETS = 1)
 
     mols = [mol for mol in mols]
-
-    #from rdkit.Chem import Draw
-    #from rdkit.Chem.Draw import rdMolDraw2D
-    #import matplotlib.pyplot as plt
-    #import io
-    #from PIL import Image
-    #m = Chem.MolToSmiles(mol)
-    #mol_with_idx = mol_with_atom_index(Chem.MolFromSmiles(m))
-
-    # Generate a 2D depiction of the molecule with indices
-    #drawer = rdMolDraw2D.MolDraw2DCairo(1500, 1500)  # or MolDraw2DSVG to get SVG output
-    #rdMolDraw2D.PrepareAndDrawMolecule(drawer, mol_with_idx)
-    #drawer.FinishDrawing()
-
-    # Get the PNG data
-    #png = drawer.GetDrawingText()
-
-    # Write the PNG data to a file
-    #with open('molecule.png', 'wb') as f:
-    #    f.write(png)
-
     return mols, AC
 
 
@@ -892,7 +857,7 @@ def get_AC(mol, covalent_factor=1.3, tr_previous_AC = [], N2collision=False):
                     AC[i, j] = 1
                     AC[j, i] = 1
                 elif len(tr_previous_AC) > 0:
-                    if tr_previous_AC[i, j] > 0 and dMat[i, j] <= (Rcov_i + Rcov_j) * 2:
+                    if tr_previous_AC[i, j] > 0 and dMat[i, j] <= (Rcov_i + Rcov_j) * 1.5:
                         AC[i, j] = 2
                         AC[j, i] = 2
 

@@ -73,7 +73,7 @@ def main(xyz_path, csv_path):
         fileNameForStructures = csv_path
         AC = []
 
-        for xyz_string in listOfXYZStrings:#[339:340]:
+        for xyz_string in listOfXYZStrings:
             failed = ''
             writeInAFile(fileName,xyz_string)
 
@@ -111,7 +111,8 @@ def main(xyz_path, csv_path):
                 prev_smiles = smiles
                 print(i, smiles)
             else:
-                print(i, 'same')
+                pass
+                #print(i, 'same')
 
             i += 1
 
@@ -125,5 +126,6 @@ if __name__ == "__main__":
 
     main(args.xyz_path, args.csv_path)
 
-
-    #main("C:/PostDoc/Ming_time/example_files/53_CID1.xyz", "C:/PostDoc/Ming_time/example_files/53_CID1_test.csv")
+    #main("C:/PostDoc/Ming_time/example_files/water.xyz", "C:/PostDoc/Ming_time/example_files/53_CID1_test.csv")
+    #main("C:/PostDoc/Ming_time/example_files/single_proton.xyz", "C:/PostDoc/Ming_time/example_files/53_CID1_test.csv")
+    #main("C:/PostDoc/Ming_time/example_files/CID3.xyz", "C:/PostDoc/Ming_time/example_files/53_CID1_test.csv")
