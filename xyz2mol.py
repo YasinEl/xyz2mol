@@ -110,6 +110,15 @@ atomic_electronegativity[35] = 2.96
 atomic_electronegativity[53] = 2.66
 
 
+
+def is_full(matrices, num_matrices):
+    return len(matrices) == num_matrices
+
+def check_value(matrices, indices, value):
+    return any(matrix[indices] == value for matrix in matrices)
+
+
+
 def mol_with_atom_index(mol):
     atoms = mol.GetNumAtoms()
     for idx in range(atoms):
@@ -853,14 +862,17 @@ def get_AC(mol, covalent_factor=1.3, tr_previous_AC = [], N2collision=False):
             if not N2collision or (i > num_atoms - 3) == (j > num_atoms - 3):
                 a_j = mol.GetAtomWithIdx(j)
                 Rcov_j = pt.GetRcovalent(a_j.GetAtomicNum()) * covalent_factor
-                if (dMat[i, j] <= Rcov_i + Rcov_j):
+
+                if (dMat[i, j] <= Rcov_i + Rcov_j or (len(tr_previous_AC) == 0 and (a_i.GetAtomicNum() == 1 or a_j.GetAtomicNum() == 1) and (dMat[i, j] == np.partition(dMat[i,:], 1)[1] or dMat[i, j] ==  np.partition(dMat[:, j], 1)[1]))):
                     AC[i, j] = 1
                     AC[j, i] = 1
                 elif len(tr_previous_AC) > 0:
-                    if tr_previous_AC[i, j] > 0 and dMat[i, j] <= (Rcov_i + Rcov_j) * 1.5:
+                    #if tr_previous_AC[i, j] > 0 and dMat[i, j] <= (Rcov_i + Rcov_j) * 1.5:
+                    #    AC[i, j] = 2
+                    #    AC[j, i] = 2
+                    if check_value(tr_previous_AC, (i,j), 1) and dMat[i, j] <= (Rcov_i + Rcov_j) * 1.5:
                         AC[i, j] = 2
                         AC[j, i] = 2
-
                 if AC[i, j] > 0:
                     # Check if total bonds for atom i is exceeded
                     if np.count_nonzero(AC[i, :]) > atomic_valence_electrons[a_i.GetAtomicNum()]:
@@ -962,7 +974,8 @@ def xyz2mol(atoms, coordinates, charge=0, allow_charged_fragments=True,
     AC, mol = xyz2AC(atoms, coordinates, charge,
                      use_huckel=use_huckel, tr_previous_AC=tr_previous_AC,
                      N2collision=N2collision)
-
+    if np.array_equal(AC, tr_previous_AC):
+        return 'same', AC
     # Convert AC to bond order matrix and add connectivity and charge info to
     # mol object
     new_mols, AC = AC2mol(mol, AC, atoms, charge,

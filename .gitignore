@@ -106,3 +106,4 @@ ENV/
 env_xyz2mol/
 
 *.sh
+*.xyz

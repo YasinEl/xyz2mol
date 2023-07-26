@@ -3,6 +3,15 @@ import argparse
 from rdkit import Chem, rdBase
 from xyz2mol import *
 import re
+import numpy as np
+
+
+def add_matrix(matrices, matrix, num_matrices):
+    matrices.append(matrix)
+    if len(matrices) > num_matrices:
+        matrices.pop(0)
+    return matrices
+
 
 def separateXYZGroupIntoXYZIndividualStrings(xyzGroupedMolecules):
     firstLine = xyzGroupedMolecules[0]
@@ -62,6 +71,7 @@ def main(xyz_path, csv_path):
     xyz_filename = xyz_path.split('/')[-1]
     CID_substring = re.compile(r'CID\d+')
     is_CID_file = CID_substring.search(xyz_filename) != None
+    num_matrices = 4
 
     with open(xyz_path) as fp:
 
@@ -71,7 +81,7 @@ def main(xyz_path, csv_path):
         prev_smiles = None
         fileName = "temp.xyz"
         fileNameForStructures = csv_path
-        AC = []
+        AC_prev = []
 
         for xyz_string in listOfXYZStrings:
             failed = ''
@@ -83,13 +93,21 @@ def main(xyz_path, csv_path):
                 failed = 'xyz'
                 print(str(xyz_path) + ' was not read successfully!')
                 print(e)
+            #print(matrix_holder.get_last_n())
 
             try:
                 if failed == '':
                     molStructure, AC = xyz2mol(atoms, xyz_coordinates, charge=1, allow_charged_fragments=True,
                                 use_graph=True, use_huckel=False, embed_chiral=False,
-                                use_atom_maps=False, tr_previous_AC = AC, N2collision = is_CID_file)
-                    smiles = Chem.MolToSmiles(molStructure[0])
+                                use_atom_maps=False, tr_previous_AC = AC_prev, N2collision = is_CID_file)
+
+                    AC_prev = add_matrix(AC_prev, AC, num_matrices)
+
+                    if molStructure != 'same':
+                        smiles = Chem.MolToSmiles(molStructure[0])
+
+
+
             except Exception as e:
                 failed = 'mol'
                 print(str(i) + 'molecule processing failed! (' + xyz_path + ')')
@@ -129,3 +147,8 @@ if __name__ == "__main__":
     #main("C:/PostDoc/Ming_time/example_files/water.xyz", "C:/PostDoc/Ming_time/example_files/53_CID1_test.csv")
     #main("C:/PostDoc/Ming_time/example_files/single_proton.xyz", "C:/PostDoc/Ming_time/example_files/53_CID1_test.csv")
     #main("C:/PostDoc/Ming_time/example_files/CID3.xyz", "C:/PostDoc/Ming_time/example_files/53_CID1_test.csv")
+    #main("C:/PostDoc/Ming_time/example_files/CID4.xyz", "C:/PostDoc/Ming_time/example_files/53_CID1_test.csv")
+    #print('next')
+    #main("C:/PostDoc/Ming_time/example_files/MDtrj.27.4.xyz", "C:/PostDoc/Ming_time/example_files/53_CID1_test.csv")
+
+
