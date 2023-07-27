@@ -633,7 +633,7 @@ def process_pairs(UA_pairs_list_raw, UA, DU_from_AC, octet_offset, electro_negat
 
     return result_dict
 
-def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
+def AC2BO(AC, atoms, use_graph=True, tr_previous_AC = []):
     """
 
     implemenation of algorithm shown in Figure 2
@@ -698,6 +698,10 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
         if valence_valid == True:
             break
 
+    if tr_previous_AC and np.array_equal(AC, tr_previous_AC[-1]):
+        return AC, AC, AC, True
+
+
     for valences in valences_list: #atm just 1 iteration because I use maximum allowed bonds
         UA, DU_from_AC, octet_offset, electro_negativity = get_UA(valences, AC_valence, atom_valenceElectrons, atom_electroNegativiy)
 
@@ -707,21 +711,24 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
     BO = get_BO(AC, UA, DU_from_AC, valences, UA_pairs, use_graph=use_graph)
 
 
-    return BO, atomic_valence_electrons, AC
+    return BO, atomic_valence_electrons, AC, False
 
 
 def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True, 
-           use_graph=True, use_atom_maps=False):
+           use_graph=True, use_atom_maps=False, tr_previous_AC=[]):
     """
     """
+    same_AC = False
 
     # convert AC matrix to bond order (BO) matrix
-    BO, atomic_valence_electrons, AC = AC2BO(
-        AC,
-        atoms,
-        charge,
-        allow_charged_fragments=allow_charged_fragments,
-        use_graph=use_graph)
+    BO, atomic_valence_electrons, AC, same_AC = AC2BO(
+        AC=AC,
+        atoms=atoms,
+        use_graph=use_graph,
+        tr_previous_AC=tr_previous_AC)
+
+    if same_AC:
+        return 'same', AC
 
     # add BO connectivity and charge info to mol object
     mol = BO2mol(
@@ -867,9 +874,6 @@ def get_AC(mol, covalent_factor=1.3, tr_previous_AC = [], N2collision=False):
                     AC[i, j] = 1
                     AC[j, i] = 1
                 elif len(tr_previous_AC) > 0:
-                    #if tr_previous_AC[i, j] > 0 and dMat[i, j] <= (Rcov_i + Rcov_j) * 1.5:
-                    #    AC[i, j] = 2
-                    #    AC[j, i] = 2
                     if check_value(tr_previous_AC, (i,j), 1) and dMat[i, j] <= (Rcov_i + Rcov_j) * 1.5:
                         AC[i, j] = 2
                         AC[j, i] = 2
@@ -946,6 +950,21 @@ def chiral_stereo_check(mol):
 
     return
 
+def harmonize_smiles_rdkit(smiles):
+    try:
+
+        ps = Chem.SmilesParserParams()
+        ps.removeHs = False
+
+        mol = Chem.MolFromSmiles(smiles,ps)
+
+
+        # get the standardized SMILES with explicit hydrogens
+        standard_smiles = Chem.MolToSmiles(mol)
+        return standard_smiles
+    except Exception as e:
+        print(f"An error occurred with input {smiles}: {e}")
+        return ""
 
 def xyz2mol(atoms, coordinates, charge=0, allow_charged_fragments=True,
             use_graph=True, use_huckel=False, embed_chiral=True,
@@ -968,25 +987,32 @@ def xyz2mol(atoms, coordinates, charge=0, allow_charged_fragments=True,
         mols - list of rdkit molobjects
 
     """
-
     # Get atom connectivity (AC) matrix, list of atomic numbers, molecular charge,
     # and mol object with no connectivity information
     AC, mol = xyz2AC(atoms, coordinates, charge,
                      use_huckel=use_huckel, tr_previous_AC=tr_previous_AC,
                      N2collision=N2collision)
-    if np.array_equal(AC, tr_previous_AC):
+
+
+    if tr_previous_AC and np.array_equal(AC, tr_previous_AC[-1]):
         return 'same', AC
     # Convert AC to bond order matrix and add connectivity and charge info to
     # mol object
     new_mols, AC = AC2mol(mol, AC, atoms, charge,
-                     allow_charged_fragments=allow_charged_fragments,
-                     use_graph=use_graph,
-                     use_atom_maps=use_atom_maps)
+                          allow_charged_fragments=allow_charged_fragments,
+                          use_graph=use_graph,
+                          use_atom_maps=use_atom_maps,
+                          tr_previous_AC=tr_previous_AC)
+
+
+    if new_mols == 'same':
+        return 'same', AC
 
     # Check for stereocenters and chiral centers
     if embed_chiral:
         for new_mol in new_mols:
             chiral_stereo_check(new_mol)
+
 
     return new_mols, AC
 
