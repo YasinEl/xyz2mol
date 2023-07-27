@@ -62,9 +62,10 @@ remove_equilibrium_reactions = function(dt){
 
 
 
-root = 'C:/PostDoc/Ming_time/example_files/csvs'
+root = 'C:/PostDoc/Ming_time/example_files/csv_tim_harm'
+pattern = '2_protonated_mol_1'
 
-folders = list.files(root, full.names = TRUE, pattern = '2_protonated_mol_3')
+folders = list.files(root, full.names = TRUE, pattern = pattern)
 reduce_to_relevant = TRUE
 
 li_allTrj = list()
@@ -123,5 +124,5 @@ li_allTrj = fill_empty_rows(li_allTrj)
 
 dt_combined <- do.call(cbind, li_allTrj)
 
-fwrite(dt_combined, paste0('C:/PostDoc/Ming_time/example_files/csvs_summary/summary_,', '2_protonated_mol_3_reduced', '.csv'))
+fwrite(dt_combined, paste0('C:/PostDoc/Ming_time/example_files/csvs_summary/summary_,', pattern, '.csv'))
 

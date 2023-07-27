@@ -225,6 +225,7 @@ if __name__ == "__main__":
     #print('next')
     #main("C:/PostDoc/Ming_time/example_files/MDtrj.27.4.xyz", "C:/PostDoc/Ming_time/example_files/53_CID1_test.csv")
     #main("C:/PostDoc/Ming_time/example_files/MDtrj.75.2.xyz", "C:/PostDoc/Ming_time/example_files/53_CID1_test.csv")
+    #main("C:/PostDoc/Ming_time/example_files/MDtrj.30.3.xyz", "C:/PostDoc/Ming_time/example_files/53_CID1_test.csv")
 
     #profiler.disable()
     #profiler.print_stats(sort="time")
