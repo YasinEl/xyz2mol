@@ -62,8 +62,8 @@ remove_equilibrium_reactions = function(dt){
 
 
 
-root = 'C:/PostDoc/Ming_time/example_files/csv_tim_harm'
-pattern = '2_protonated_mol_1'
+root = 'C:/PostDoc/Ming_time/example_files/csvs_batch'
+pattern = '18_protonated_mol_1'
 
 folders = list.files(root, full.names = TRUE, pattern = pattern)
 reduce_to_relevant = TRUE
@@ -122,7 +122,37 @@ for (folder_idx in seq(length(folders))){
 } 
 li_allTrj = fill_empty_rows(li_allTrj)
 
-dt_combined <- do.call(cbind, li_allTrj)
+dt_combinedC <- do.call(cbind, li_allTrj)
 
-fwrite(dt_combined, paste0('C:/PostDoc/Ming_time/example_files/csvs_summary/summary_,', pattern, '.csv'))
+fwrite(dt_combinedC, paste0('C:/PostDoc/Ming_time/example_files/csvs_summary/summary_,', pattern, '.csv'))
+
+li_allTrj = 
+lapply(li_allTrj, function(x){
+  
+  cn = strsplit(colnames(x), '_')
+  trj_id = cn[[1]][2]
+  cn = lapply(cn, function(y){
+    return(y[1])
+  })
+  cn = unlist(cn)
+  colnames(x) = cn
+  
+  x[, trj := trj_id]
+  return(x)
+})
+
+
+dt_combinedR = rbindlist(li_allTrj)
+dt_combinedR = dt_combinedR[!is.na(id)]
+dt_combinedR[, smiles_id := .GRP, by =.(SMILES)]
+dt_combinedR[, last_smiles := smiles_id[which.max(id)], by =.(trj)]
+dt_combinedR[, full_trj := paste0(smiles_id, collapse = ','), by =.(trj)]
+
+
+dt_full_trj_summary = dt_combinedR[, .(SMILES = unique(SMILES), 
+                                       n = .N), by =.(full_trj)]
+
+head(dt_combinedR)
+
+
 

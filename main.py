@@ -3,6 +3,7 @@ import argparse
 from rdkit import Chem, rdBase
 from xyz2mol import *
 import re
+import os
 import numpy as np
 
 
@@ -34,7 +35,6 @@ def parse_out_file(filename):
                     parsed_data[current_key] = {"charges_per_fragment": [], "fragments": {}, "step": []}
 
                 if "FRAGMENTATION occured!" in current_line:
-                    #step_start = int(last_line.split()[0]) if last_line and last_line.split()[0].isdigit() else None
                     a = 0
                     while not previous_line or not previous_line.split()[0].isdigit():
                         a -= 1
@@ -161,6 +161,7 @@ def main(xyz_path, csv_path):
         i =0
         prev_smiles = None
         fileName = "temp.xyz"
+        fileName = os.path.join(os.path.dirname(csv_path), fileName)
         fileNameForStructures = csv_path
         AC_prev = []
 
