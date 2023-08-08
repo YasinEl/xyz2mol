@@ -1,16 +1,18 @@
-#!/usr/bin/env python3
-
 import os
+import argparse
 
-def rename_mdtrj_files(directory):
-    for dirpath, dirnames, filenames in os.walk(directory):
-        for filename in filenames:
-            if "MDtrj" in filename and not filename.endswith('.xyz'):
-                old_path = os.path.join(dirpath, filename)
-                new_path = old_path + ".xyz"
+def rename_files(directory):
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if "MDtrj" in file and not file.endswith('.xyz'):
+                old_path = os.path.join(root, file)
+                new_path = old_path + '.xyz'
                 os.rename(old_path, new_path)
-                print(f"Renamed {old_path} to {new_path}")
 
 if __name__ == "__main__":
-    directory = input("Enter the directory path: ")
-    rename_mdtrj_files(directory)
+    parser = argparse.ArgumentParser(description='Rename files with MDtrj in their name by adding .xyz extension')
+    parser.add_argument('-directory', type=str, required=True, help='Directory to search for files recursively')
+
+    args = parser.parse_args()
+
+    rename_files(args.directory)
