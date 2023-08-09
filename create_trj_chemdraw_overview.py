@@ -54,9 +54,8 @@ reduce_to_relevant = True
 
 li_allTrj = [None]*len(folders)
 
+pass
 for folder_idx, folder in enumerate(folders):
-    #if folder_idx != 98:
-    #    continue
 
     cid_files = [os.path.join(folder, f) for f in os.listdir(folder) if 'CID' in f]
     MDtrj_files = [os.path.join(folder, f) for f in os.listdir(folder) if 'MDtrj' in f]
