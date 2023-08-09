@@ -2,7 +2,7 @@
 nextflow.enable.dsl=2
 
 params.download_link = '' // No default download link
-params.csv_root_dir = '' // No default csv root dir
+params.csv_root_dir = './csvs' // No default csv root dir
 params.xyz_root_dir = 'TMPQCXMS'
 
 TOOL_FOLDER = "$baseDir"
@@ -93,11 +93,38 @@ process ConvertXYZtoCSV {
     """
 }
 
+
+process SummarizeTrajectories {
+
+    conda "$TOOL_FOLDER/requirements.yml"
+
+    publishDir "./summary_csvs", mode: 'copy'
+
+    input:
+    // path inputDir  // Directly specify the directory
+    val toolFolder
+    val csvfiles
+
+    output:
+    path "*.csv", emit: csvFile, optional: true
+
+    script:
+    """
+    mkdir -p summary_csvs
+    python3 $toolFolder/summarize_trajectories.py --input "${workflow.launchDir}/${params.csv_root_dir}"
+    """
+}
+
+
+
 workflow {
     tarFiles = DownloadData()
     extractedFiles = ExtractTar(tarFiles)
     renamedFiles = RenameFiles(extractedFiles, TOOL_FOLDER)
-    directroy_Files = AddDirectoryToNames(renamedFiles, TOOL_FOLDER)
-    ConvertXYZtoCSV(directroy_Files, TOOL_FOLDER)
+    directoryFiles = AddDirectoryToNames(renamedFiles, TOOL_FOLDER)
+    csvFiles = ConvertXYZtoCSV(directoryFiles, TOOL_FOLDER).csvFile
+    SummarizeTrajectories(TOOL_FOLDER, csvFiles.collect())
 }
+
+
 

@@ -4,6 +4,7 @@ import os
 import re
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
+import argparse
 
 def SmilesToExactMass(smiles):
     try:
@@ -63,7 +64,7 @@ def list_relevant_csv_files(directory):
 
 
 
-def summarize_trajectories(input_directory, output_directory):
+def summarize_trajectories(input_directory):
     csv_files = list_relevant_csv_files(input_directory)
     unique_trajectories = set()
 
@@ -75,6 +76,7 @@ def summarize_trajectories(input_directory, output_directory):
 
     li_allTrj = [None] * len(unique_trajectories)
     all_files = os.listdir(input_directory)
+
     for trajectory_idx, trajectory_name in enumerate(unique_trajectories):
         cid_files = [os.path.join(input_directory, f) for f in all_files if trajectory_name in f and 'CID' in f]
         MDtrj_files = [os.path.join(input_directory, f) for f in all_files if trajectory_name in f and 'MDtrj' in f]
@@ -169,16 +171,16 @@ def summarize_trajectories(input_directory, output_directory):
 
 
 
-    dt_combined.to_csv(os.path.join(output_directory, f"{trajectory_name}_overall_summary.csv"), index=False)
-    dt_combinedR.to_csv(os.path.join(output_directory, f"{trajectory_name}_overall_rows.csv"), index=False)
-    dt_full_trj_summary.to_csv(os.path.join(output_directory, f"{trajectory_name}_overall_summary_everything.csv"), index=False)
+    dt_combined.to_csv(os.path.join(f"{trajectory_name}_overall_summary.csv"), index=False)
+    dt_combinedR.to_csv(os.path.join(f"{trajectory_name}_overall_rows.csv"), index=False)
+    dt_full_trj_summary.to_csv(os.path.join(f"{trajectory_name}_overall_summary_everything.csv"), index=False)
 
 if __name__ == "__main__":
 
 
     parser = argparse.ArgumentParser(description='Summarize trajectories')
-    parser.add_argument('--input', '-i',type=str, required=True, help='Path to XYZ file')
-    parser.add_argument('--output', '-o', type=str, required=True, help='Path to CSV file for output')
+    parser.add_argument('--input', '-i',type=str, required=True, help='Path to csv files')
+    #parser.add_argument('--output', '-o', type=str, required=True, help='Path to CSV file for output')
     args = parser.parse_args()
 
-    summarize_trajectories(args.input, args.output)
+    summarize_trajectories(args.input)
