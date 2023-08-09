@@ -104,6 +104,7 @@ def summarize_trajectories(input_directory):
             li_idx += 1
 
         dt_trj = pd.concat(li_singleTrj, ignore_index=True)
+
         number = re.search(r'.*TMP\.(\d+)$', trajectory_name).group(1)
 
         #reduce to relevant
@@ -116,8 +117,6 @@ def summarize_trajectories(input_directory):
     li_allTrj = fill_empty_rows(li_allTrj)
 
     dt_combined = pd.concat(li_allTrj, axis=1)
-
-
 
     # Iterate over dataframes and modify column names
     for i in range(len(li_allTrj)):
@@ -134,53 +133,47 @@ def summarize_trajectories(input_directory):
     # Add 'smiles_id' column
     dt_combinedR['smiles_id'] = dt_combinedR.groupby('SMILES').ngroup()
 
-    # Add 'last_smiles' column
-    def get_smiles_id_with_max_id(group):
-        return group.loc[group['id'].idxmax(), 'smiles_id']
-    dt_combinedR['last_smiles'] = dt_combinedR.groupby('trj').apply(get_smiles_id_with_max_id).reset_index(level=0, drop=True)
+    group_reprs = dt_combinedR.groupby('trj').apply(
+        lambda group: ''.join([str(x) + '_' + str(y) for x, y in zip(group['id'], group['smiles_id'])])).reset_index(
+        name='group_repr')
+
+    # Calculate the count for each group_repr
+    group_reprs_counts = group_reprs['group_repr'].value_counts().reset_index()
+
+    group_reprs_counts.columns = ['group_repr', 'count']
+
+    # Merge the count back to the group_reprs dataframe
+    group_reprs = pd.merge(group_reprs, group_reprs_counts, on='group_repr')
+
+    # Merge the group_repr back to the original dataframe on 'trj'
+    dt_combinedR = pd.merge(dt_combinedR, group_reprs, on='trj')
+
+    def concatenate_unique(x):
+        # Convert the series to set (for unique values), then back to list, then join as string
+        return ', '.join(map(str, sorted(set(x))))
+
+    # Group by 'group_repr' and aggregate the 'trj' column using the above function
+    df_unique = dt_combinedR.groupby('group_repr')['trj'].agg(concatenate_unique).reset_index()
+
+    # Merge the resulting DataFrame with the original one on 'group_repr' to add the new column
+    dt_combinedR = dt_combinedR.merge(df_unique, on='group_repr', how='left').rename(columns={'trj_x': 'trj', 'trj_y': 'unique_trj_values'})
 
 
-    # Add 'full_trj' column
-    # create a dictionary where keys are 'trj' and values are the unique 'smiles_id' in each group
-    full_trj_dict = dt_combinedR.groupby('trj')['smiles_id'].unique().apply(lambda x: ','.join(map(str, x))).to_dict()
-
-    # map 'trj' column to 'full_trj' values using the dictionary
-    dt_combinedR['full_trj'] = dt_combinedR['trj'].map(full_trj_dict)
-
-
+    # Filter to keep only one representative group for each set of identical groups
+    dt_combinedR = dt_combinedR.drop_duplicates(subset=['smiles_id', 'group_repr']).drop(columns=['group_repr', 'collisions', 'trj'])
     dt_combinedR['mz'] = dt_combinedR['SMILES'].apply(SmilesToExactMass)
 
 
-    # Generate 'dt_full_trj_summary'
-    # Group by 'trj_id' and 'trj', and calculate the size of each group
-    grouped = dt_combinedR.groupby('full_trj')['trj'].nunique().reset_index(name='n')
-
-
-    # Merge back with the original DataFrame to get 'SMILES' and 'mz' columns
-    # Get the first 'trj' value of each 'full_trj' group
-    first_trj_per_group = dt_combinedR.groupby('full_trj')['trj'].transform('first')
-
-    # Create a boolean mask that is True for rows where 'trj' is the first 'trj' of its 'full_trj' group
-    mask = dt_combinedR['trj'] == first_trj_per_group
-
-    # Use the mask to filter the DataFrame
-    dt_combinedR_tmp = dt_combinedR[mask]
-
-
-    dt_full_trj_summary = pd.merge(grouped, dt_combinedR_tmp[['id','full_trj', 'SMILES', 'mz']], on='full_trj', how='left')
-
-
-
-    dt_combined.to_csv(os.path.join(f"{trajectory_name}_overall_summary.csv"), index=False)
-    dt_combinedR.to_csv(os.path.join(f"{trajectory_name}_overall_rows.csv"), index=False)
-    dt_full_trj_summary.to_csv(os.path.join(f"{trajectory_name}_overall_summary_everything.csv"), index=False)
+    dt_combined.to_csv(os.path.join("collectedTrajectories.csv"), index=False)
+    dt_combinedR.to_csv(os.path.join("overall_rows.csv"), index=False)
 
 if __name__ == "__main__":
 
 
     parser = argparse.ArgumentParser(description='Summarize trajectories')
     parser.add_argument('--input', '-i',type=str, required=True, help='Path to csv files')
-    #parser.add_argument('--output', '-o', type=str, required=True, help='Path to CSV file for output')
     args = parser.parse_args()
 
     summarize_trajectories(args.input)
+
+    #summarize_trajectories("C:/Users/elabi/Downloads/csvs", "C:/PostDoc/Ming_time/example_files/test")
