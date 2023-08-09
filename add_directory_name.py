@@ -7,7 +7,7 @@ def rename_with_parent(directory):
         for file in files:
             if file.endswith('.xyz'):
                 parent_dir = os.path.basename(root)
-                new_name = f"{parent_dir}_{file}"
+                new_name = f"{parent_dir}__{file}"
                 old_path = os.path.join(root, file)
                 new_path = os.path.join(root, new_name)
 
