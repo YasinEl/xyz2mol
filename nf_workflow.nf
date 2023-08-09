@@ -41,7 +41,7 @@ process RenameFiles {
     val toolFolder
 
     output:
-    path("${inputDir}/*"), emit: renamedFiles
+    path("${inputDir}"), emit: renamedFiles
 
     script:
     """
@@ -49,22 +49,47 @@ process RenameFiles {
     """
 }
 
-
-process ConvertXYZtoCSV {
+process AddDirectoryToNames {
     input:
-    path xyz_file 
+    path inputDir
     val toolFolder
 
     output:
-    path "*.csv", emit: csvFile
+    path("${inputDir}/**"), emit: renamedFiles
 
     script:
     """
-    csv_file="\${xyz_file/unique_named_xyzs/params.csv_root_dir}"
-    csv_file="\${csv_file%.xyz}.csv"
-    csv_dir=\$(dirname "\$csv_file")
-    mkdir -p "\$csv_dir"
-    python3 $toolFolder/main.py -xyz "\$xyz_file" -csv "\$csv_file"
+    python3 $toolFolder/add_directory_name.py -directory "$inputDir"
+    """
+}
+
+process ConvertXYZtoCSV {
+    conda "$TOOL_FOLDER/requirements.yml"
+
+    publishDir "./csvs", mode: 'copy'
+
+    input:
+    each xyz_file 
+    val toolFolder
+
+    output:
+    path "*.csv", emit: csvFile, optional: true
+
+    script:
+    """
+    csv_file="${xyz_file.baseName}.csv"
+
+
+    # Check if the file has a .xyz extension
+    if [[ "$xyz_file" == *.xyz ]]; then
+        python3 $toolFolder/main.py -xyz "$xyz_file" -csv "\$csv_file"
+    else
+        echo "Not an .xyz file. Skipping..."
+    fi
+
+    
+    
+    
     """
 }
 
@@ -72,6 +97,7 @@ workflow {
     tarFiles = DownloadData()
     extractedFiles = ExtractTar(tarFiles)
     renamedFiles = RenameFiles(extractedFiles, TOOL_FOLDER)
-    ConvertXYZtoCSV(renamedFiles, TOOL_FOLDER)
+    directroy_Files = AddDirectoryToNames(renamedFiles, TOOL_FOLDER)
+    ConvertXYZtoCSV(directroy_Files, TOOL_FOLDER)
 }
 

@@ -2,4 +2,5 @@ name: x2m_env
 dependencies:
   - python=3.7
   - rdkit::rdkit
+  - networkx
   - pip
