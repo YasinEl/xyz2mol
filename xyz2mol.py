@@ -667,10 +667,11 @@ def AC2BO(AC, atoms, use_graph=True, tr_previous_AC = []):
         if attempt_to_keep_bonds:
             if remove_attempted_bonds == False:
                 AC[AC == 2] = 1
-                AC[AC == 3] = 1
+                #AC[AC == 3] = 1
+
             if remove_attempted_bonds == True:
                 AC[AC == 2] = 0
-                AC[AC == 3] = 1
+                #AC[AC == 3] = 1
 
         # make a list of valences, e.g. for CO: [[4],[2,1]]
         valences_list_of_lists = []
@@ -898,10 +899,10 @@ def get_AC(mol, covalent_factor=1.3, tr_previous_AC = [], N2collision=False):
                         AC[j, max_dist_i] = 0
                         AC[max_dist_i, j] = 0
 
-                    if AC[i, j] > 0 and len(tr_previous_AC) > 0:
-                        if check_value(tr_previous_AC, (i,j), 0, 'any') and :
-                            AC[i, j] = 3
-                            AC[j, i] = 3
+                    #if AC[i, j] > 0 and len(tr_previous_AC) > 0:
+                    #    if check_value(tr_previous_AC, (i,j), 0, 'any'):
+                    #        AC[i, j] = 3
+                    #        AC[j, i] = 3
 
 
     return AC
