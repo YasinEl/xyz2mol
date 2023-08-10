@@ -85,10 +85,21 @@ def parse_out_file(filename):
 
 
 
-outfile = parse_out_file('C:/PostDoc/Ming_time/example_files/qcxms.out')
+if __name__ == "__main__":
+    #import cProfile
+    #profiler = cProfile.Profile()
+    #profiler.enable()
+    #outfile = parse_out_file('C:/PostDoc/Ming_time/example_files/qcxms.out')
+    #from pprint import pprint
+    #pprint(outfile)
 
-from pprint import pprint
+
+    parser = argparse.ArgumentParser(description='Parse qcxms.out')
+    parser.add_argument('--filepath', '-i', type=str, required=True, help='Path to qcxms.out')
+    args = parser.parse_args()
+
+    main(args.filepath)
 
 
-pprint(outfile)
+
 
