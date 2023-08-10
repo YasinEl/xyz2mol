@@ -81,27 +81,34 @@ def summarize_trajectories(input_directory):
         cid_files = [os.path.join(input_directory, f) for f in all_files if trajectory_name in f and 'CID' in f]
         MDtrj_files = [os.path.join(input_directory, f) for f in all_files if trajectory_name in f and 'MDtrj' in f]
 
-
-        li_singleTrj = [None]*(len(cid_files) + len(MDtrj_files))
-        li_idx = 0
+        li_singleTrj = []
 
         dt = pd.read_csv(MDtrj_files[0], header=None)
         dt['file'] = os.path.basename(MDtrj_files[0])
         dt['collisions'] = 0
-        li_singleTrj[li_idx] = dt
-        li_idx += 1
+        li_singleTrj.append(dt)
 
-        for cid_idx, (cid_file, MDtrj_file) in enumerate(zip(cid_files, MDtrj_files[1:])):
 
+        li_singleTrj = []
+        cid_files = sorted(cid_files, key=lambda x: int(x.split("CID")[1].split('.')[0]))
+        MDtrj_files = sorted(MDtrj_files[1:], key=lambda x: (int(x.split(".")[-3]), int(x.split(".")[-2])))
+
+        for cid_file in cid_files:
             dt_cid = pd.read_csv(cid_file, header=None)
-            dt_md = pd.read_csv(MDtrj_file, header=None)
             dt_cid['file'] = os.path.basename(cid_file)
-            dt_md['file'] = os.path.basename(MDtrj_file)
-            dt_cid['collisions'] = cid_idx + 1
-            dt_md['collisions'] = cid_idx + 1
-            li_singleTrj[li_idx*2-1] = dt_cid
-            li_singleTrj[li_idx*2] = dt_md
-            li_idx += 1
+            cid_idx = int(cid_file.split("CID")[1].split('.')[0])
+            dt_cid['collisions'] = cid_idx
+            li_singleTrj.append(dt_cid)
+
+            # Filter and sort the corresponding MDtrj files for the current CID file
+            corresponding_MDtrj_files = sorted([f for f in MDtrj_files if f.split(".")[-3] == str(cid_idx)],
+                                               key=lambda x: int(x.split(".")[-2]))
+
+            for MDtrj_file in corresponding_MDtrj_files:
+                dt_md = pd.read_csv(MDtrj_file, header=None)
+                dt_md['file'] = os.path.basename(MDtrj_file)
+                dt_md['collisions'] = cid_idx
+                li_singleTrj.append(dt_md)
 
         dt_trj = pd.concat(li_singleTrj, ignore_index=True)
 
@@ -164,16 +171,16 @@ def summarize_trajectories(input_directory):
     dt_combinedR['mz'] = dt_combinedR['SMILES'].apply(SmilesToExactMass)
 
 
-    dt_combined.to_csv(os.path.join("collectedTrajectories.csv"), index=False)
-    dt_combinedR.to_csv(os.path.join("overall_rows.csv"), index=False)
+    dt_combined.to_csv(os.path.join("C:/PostDoc/Ming_time/example_files/test/collectedTrajectories.csv"), index=False)
+    dt_combinedR.to_csv(os.path.join("C:/PostDoc/Ming_time/example_files/test/overall_rows.csv"), index=False)
 
 if __name__ == "__main__":
 
 
-    parser = argparse.ArgumentParser(description='Summarize trajectories')
-    parser.add_argument('--input', '-i',type=str, required=True, help='Path to csv files')
-    args = parser.parse_args()
+    #parser = argparse.ArgumentParser(description='Summarize trajectories')
+    #parser.add_argument('--input', '-i',type=str, required=True, help='Path to csv files')
+    #args = parser.parse_args()
 
-    summarize_trajectories(args.input)
+    #summarize_trajectories(args.input)
 
-    #summarize_trajectories("C:/Users/elabi/Downloads/csvs", "C:/PostDoc/Ming_time/example_files/test")
+    summarize_trajectories("C:/Users/elabi/Downloads/csvs")

@@ -799,7 +799,7 @@ def read_xyz_file(filename, look_for_charge=True):
     return atoms, charge, xyz_coordinates
 
 
-def xyz2AC(atoms, xyz, charge, use_huckel=False, tr_previous_AC = [], N2collision = False):
+def xyz2AC(atoms, xyz, charge, use_huckel=False, tr_previous_AC = [], tr_previous_dMat = [], N2collision = False):
     """
 
     atoms and coordinates to atom connectivity (AC)
@@ -821,10 +821,10 @@ def xyz2AC(atoms, xyz, charge, use_huckel=False, tr_previous_AC = [], N2collisio
     if use_huckel:
         return xyz2AC_huckel(atoms, xyz, charge, N2collision = N2collision)
     else:
-        return xyz2AC_vdW(atoms, xyz, tr_previous_AC, N2collision = N2collision)
+        return xyz2AC_vdW(atoms, xyz, tr_previous_AC, tr_previous_dMat, N2collision = N2collision)
 
 
-def xyz2AC_vdW(atoms, xyz, tr_previous_AC = [], N2collision = False):
+def xyz2AC_vdW(atoms, xyz, tr_previous_AC = [], tr_previous_dMat = [], N2collision = False):
 
     # Get mol template
     mol = get_proto_mol(atoms)
@@ -835,13 +835,20 @@ def xyz2AC_vdW(atoms, xyz, tr_previous_AC = [], N2collision = False):
         conf.SetAtomPosition(i, (xyz[i][0], xyz[i][1], xyz[i][2]))
     mol.AddConformer(conf)
 
-    AC = get_AC(mol, covalent_factor = 1.40, tr_previous_AC = tr_previous_AC,
-                N2collision=N2collision)
+    AC, dMat = get_AC(mol, covalent_factor = 1.40, tr_previous_AC = tr_previous_AC,
+                      tr_previous_dMat = tr_previous_dMat,
+                      N2collision=N2collision)
 
-    return AC, mol
+    return AC, dMat, mol
 
+def is_increasing(matrices, i, j, check_length=5):
+    if len(matrices) < check_length:
+        return False
+    # Get the values at position (i, j) for the last 'check_length' matrices
+    values = [matrix[i][j] for matrix in matrices[-check_length:]]
+    return all(values[k] > values[k-1] for k in range(1, check_length))
 
-def get_AC(mol, covalent_factor=1.3, tr_previous_AC = [], N2collision=False):
+def get_AC(mol, covalent_factor=1.3, tr_previous_AC = [], tr_previous_dMat = [], N2collision=False):
     """
 
     Generate adjacent matrix from atoms and coordinates.
@@ -881,7 +888,7 @@ def get_AC(mol, covalent_factor=1.3, tr_previous_AC = [], N2collision=False):
                     AC[i, j] = 1
                     AC[j, i] = 1
                 elif len(tr_previous_AC) > 0:
-                    if check_value(tr_previous_AC, (i,j), 1, 'any') and dMat[i, j] <= (Rcov_i + Rcov_j) * 1.5:
+                    if check_value(tr_previous_AC, (i,j), 1, 'any') and not is_increasing(tr_previous_dMat, i, j, 5):#dMat[i, j] <= (Rcov_i + Rcov_j) * 1.5:
                         AC[i, j] = 2
                         AC[j, i] = 2
                 if AC[i, j] > 0:
@@ -905,7 +912,7 @@ def get_AC(mol, covalent_factor=1.3, tr_previous_AC = [], N2collision=False):
                     #        AC[j, i] = 3
 
 
-    return AC
+    return AC, dMat
 
 
 def xyz2AC_huckel(atomicNumList, xyz, charge, N2collision=False):
@@ -981,7 +988,7 @@ def harmonize_smiles_rdkit(smiles):
 
 def xyz2mol(atoms, coordinates, charge=0, allow_charged_fragments=True,
             use_graph=True, use_huckel=False, embed_chiral=True,
-            use_atom_maps=False, tr_previous_AC = [], N2collision = False):
+            use_atom_maps=False, tr_previous_AC = [], tr_previous_dMat = [], N2collision = False):
     """
     Generate a rdkit molobj from atoms, coordinates and a total_charge.
 
@@ -1002,13 +1009,15 @@ def xyz2mol(atoms, coordinates, charge=0, allow_charged_fragments=True,
     """
     # Get atom connectivity (AC) matrix, list of atomic numbers, molecular charge,
     # and mol object with no connectivity information
-    AC, mol = xyz2AC(atoms, coordinates, charge,
-                     use_huckel=use_huckel, tr_previous_AC=tr_previous_AC,
-                     N2collision=N2collision)
+    AC, dMat, mol = xyz2AC(atoms, coordinates, charge,
+                           use_huckel=use_huckel,
+                           tr_previous_AC=tr_previous_AC,
+                           tr_previous_dMat = tr_previous_dMat,
+                           N2collision=N2collision)
 
 
     if tr_previous_AC and np.array_equal(AC, tr_previous_AC[-1]):
-        return 'same', AC
+        return 'same', AC, dMat
     # Convert AC to bond order matrix and add connectivity and charge info to
     # mol object
     new_mols, AC = AC2mol(mol, AC, atoms, charge,
@@ -1019,7 +1028,7 @@ def xyz2mol(atoms, coordinates, charge=0, allow_charged_fragments=True,
 
 
     if new_mols == 'same':
-        return 'same', AC
+        return 'same', AC, dMat
 
     # Check for stereocenters and chiral centers
     if embed_chiral:
@@ -1027,7 +1036,7 @@ def xyz2mol(atoms, coordinates, charge=0, allow_charged_fragments=True,
             chiral_stereo_check(new_mol)
 
 
-    return new_mols, AC
+    return new_mols, AC, dMat
 
 
 

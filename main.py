@@ -161,6 +161,7 @@ def main(xyz_path, csv_path):
         fileName = os.path.join(os.path.dirname(csv_path), fileName)
         fileNameForStructures = csv_path
         AC_prev = []
+        dMat_prev = []
 
         for xyz_string in listOfXYZStrings:
             failed = ''
@@ -176,12 +177,12 @@ def main(xyz_path, csv_path):
 
             try:
                 if failed == '':
-                    molStructure, AC = xyz2mol(atoms, xyz_coordinates, charge=1, allow_charged_fragments=True,
+                    molStructure, AC, dMat = xyz2mol(atoms, xyz_coordinates, charge=1, allow_charged_fragments=True,
                                 use_graph=True, use_huckel=False, embed_chiral=False,
-                                use_atom_maps=False, tr_previous_AC = AC_prev, N2collision = is_CID_file)
+                                use_atom_maps=False, tr_previous_AC = AC_prev, tr_previous_dMat = dMat_prev, N2collision = is_CID_file)
 
                     AC_prev = add_matrix(AC_prev, AC, num_matrices)
-
+                    dMat_prev = add_matrix(dMat_prev, dMat, num_matrices)
                     if molStructure != 'same':
                         smiles = Chem.MolToSmiles(molStructure[0])
                         smiles = harmonize_smiles_rdkit(smiles)
