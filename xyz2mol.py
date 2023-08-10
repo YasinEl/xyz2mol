@@ -383,6 +383,7 @@ def get_atomic_charge(atom, atomic_valence_electrons, BO_valence):
         charge = 3 - BO_valence
     elif atom == 6 and BO_valence == 2:
         charge = 0
+        radical = True
     elif atom == 7 and BO_valence == 2:
         charge = 1
         radical = True
@@ -527,8 +528,9 @@ def set_atomic_charges(mol, atoms, atomic_valence_electrons,
 
         if (abs(charge) != 0 and radical == False):
             a.SetFormalCharge(int(charge))
-        if (abs(charge) != 0 and radical == True):
-            a.SetFormalCharge(int(charge))
+        if (radical == True):
+            if abs(charge) != 0:
+                a.SetFormalCharge(int(charge))
             a.SetNumRadicalElectrons(int(atomic_valence_electrons[atom] - BO_valences[i] - charge))
     #mol = clean_charges(mol)
 
