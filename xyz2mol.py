@@ -879,16 +879,28 @@ def get_AC(mol, covalent_factor=1.3, tr_previous_AC = [], tr_previous_dMat = [],
         a_i = mol.GetAtomWithIdx(i)
         Rcov_i = pt.GetRcovalent(a_i.GetAtomicNum()) * covalent_factor
         for j in range(i + 1, num_atoms):
-            #this check is to not allow connections between the colliding N2 and the molecule
-            if not N2collision or (i > num_atoms - 3) == (j > num_atoms - 3):
+
+            if not N2collision or (i > num_atoms - 3) == (j > num_atoms - 3): #this check is to not allow reactions between the colliding N2 and the molecule
                 a_j = mol.GetAtomWithIdx(j)
                 Rcov_j = pt.GetRcovalent(a_j.GetAtomicNum()) * covalent_factor
 
-                if (dMat[i, j] <= Rcov_i + Rcov_j or (len(tr_previous_AC) == 0 and (a_i.GetAtomicNum() == 1 or a_j.GetAtomicNum() == 1) and (dMat[i, j] == np.partition(dMat[i,:], 1)[1] or dMat[i, j] ==  np.partition(dMat[:, j], 1)[1]))):
+                #if first frame hydrogen should never be free and distances should be tolerant
+                if (dMat[i, j] <= Rcov_i + Rcov_j and len(tr_previous_AC) == 0) or (len(tr_previous_AC) == 0 and (a_i.GetAtomicNum() == 1 or a_j.GetAtomicNum() == 1) and (dMat[i, j] == np.partition(dMat[i,:], 1)[1] or dMat[i, j] ==  np.partition(dMat[:, j], 1)[1])):
                     AC[i, j] = 1
                     AC[j, i] = 1
+
                 elif len(tr_previous_AC) > 0:
-                    if check_value(tr_previous_AC, (i,j), 1, 'any') and not is_increasing(tr_previous_dMat, i, j, 5):#dMat[i, j] <= (Rcov_i + Rcov_j) * 1.5:
+                    #if not first frame are more strict with the formation of new bonds
+                    if dMat[i, j] <= Rcov_i + Rcov_j and check_value(tr_previous_AC, (i,j), 0, 'any'):
+                        if dMat[i, j] <= Rcov_i + Rcov_j * 0.8:
+                            AC[i, j] = 1
+                            AC[j, i] = 1
+                        else:
+                            AC[i, j] = 0
+                            AC[j, i] = 0
+
+                    #we are also more strict with breaking bonds
+                    elif check_value(tr_previous_AC, (i,j), 1, 'any') and not is_increasing(tr_previous_dMat, i, j, 5):#dMat[i, j] <= (Rcov_i + Rcov_j) * 1.5:
                         AC[i, j] = 2
                         AC[j, i] = 2
                 if AC[i, j] > 0:
@@ -906,10 +918,6 @@ def get_AC(mol, covalent_factor=1.3, tr_previous_AC = [], tr_previous_dMat = [],
                         AC[j, max_dist_i] = 0
                         AC[max_dist_i, j] = 0
 
-                    #if AC[i, j] > 0 and len(tr_previous_AC) > 0:
-                    #    if check_value(tr_previous_AC, (i,j), 0, 'any'):
-                    #        AC[i, j] = 3
-                    #        AC[j, i] = 3
 
 
     return AC, dMat
