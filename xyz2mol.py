@@ -114,8 +114,12 @@ atomic_electronegativity[53] = 2.66
 def is_full(matrices, num_matrices):
     return len(matrices) == num_matrices
 
-def check_value(matrices, indices, value):
-    return any(matrix[indices] == value for matrix in matrices)
+def check_value(matrices, indices, value, check = 'any'):
+    if check == 'any':
+        result = any(matrix[indices] == value for matrix in matrices)
+    elif check == 'all':
+        result = all(matrix[indices] == value for matrix in matrices)
+    return result
 
 
 
@@ -657,7 +661,7 @@ def AC2BO(AC, atoms, use_graph=True, tr_previous_AC = []):
 
     remove_attempted_bonds = False
     valence_valid = False
-
+    ##there
     for try_con in range(reps):
         AC = AC_save.copy()
         if attempt_to_keep_bonds:
@@ -874,7 +878,7 @@ def get_AC(mol, covalent_factor=1.3, tr_previous_AC = [], N2collision=False):
                     AC[i, j] = 1
                     AC[j, i] = 1
                 elif len(tr_previous_AC) > 0:
-                    if check_value(tr_previous_AC, (i,j), 1) and dMat[i, j] <= (Rcov_i + Rcov_j) * 1.5:
+                    if check_value(tr_previous_AC, (i,j), 1, 'any') and dMat[i, j] <= (Rcov_i + Rcov_j) * 1.5:
                         AC[i, j] = 2
                         AC[j, i] = 2
                 if AC[i, j] > 0:
@@ -885,12 +889,18 @@ def get_AC(mol, covalent_factor=1.3, tr_previous_AC = [], N2collision=False):
                         AC[i, max_dist_j] = 0
                         AC[max_dist_j, i] = 0
 
-                        # Check if total bonds for atom j is exceeded
+                    # Check if total bonds for atom j is exceeded
                     if np.count_nonzero(AC[j, :]) > atomic_valence_electrons[a_j.GetAtomicNum()]:
                         # Find the bond with the highest distance and remove it
                         max_dist_i = np.argmax(dMat[j, :] * AC[j, :])
                         AC[j, max_dist_i] = 0
                         AC[max_dist_i, j] = 0
+
+                    if AC[i, j] > 0 and len(tr_previous_AC) > 0:
+                        if check_value(tr_previous_AC, (i,j), 0, 'any'):
+                            AC[i, j] = 0
+                            AC[j, i] = 0
+
 
     return AC
 
