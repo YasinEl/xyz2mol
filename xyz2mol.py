@@ -667,7 +667,7 @@ def AC2BO(AC, atoms, use_graph=True, tr_previous_AC = []):
         if attempt_to_keep_bonds:
             if remove_attempted_bonds == False:
                 AC[AC == 2] = 1
-                AC[AC == 3] = 0
+                AC[AC == 3] = 1
             if remove_attempted_bonds == True:
                 AC[AC == 2] = 0
                 AC[AC == 3] = 1
