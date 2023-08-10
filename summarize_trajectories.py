@@ -171,16 +171,16 @@ def summarize_trajectories(input_directory):
     dt_combinedR['mz'] = dt_combinedR['SMILES'].apply(SmilesToExactMass)
 
 
-    dt_combined.to_csv(os.path.join("C:/PostDoc/Ming_time/example_files/test/collectedTrajectories.csv"), index=False)
-    dt_combinedR.to_csv(os.path.join("C:/PostDoc/Ming_time/example_files/test/overall_rows.csv"), index=False)
+    dt_combined.to_csv(os.path.join("collectedTrajectories.csv"), index=False)
+    dt_combinedR.to_csv(os.path.join("overall_rows.csv"), index=False)
 
 if __name__ == "__main__":
 
 
-    #parser = argparse.ArgumentParser(description='Summarize trajectories')
-    #parser.add_argument('--input', '-i',type=str, required=True, help='Path to csv files')
-    #args = parser.parse_args()
+    parser = argparse.ArgumentParser(description='Summarize trajectories')
+    parser.add_argument('--input', '-i',type=str, required=True, help='Path to csv files')
+    args = parser.parse_args()
 
-    #summarize_trajectories(args.input)
+    summarize_trajectories(args.input)
 
-    summarize_trajectories("C:/Users/elabi/Downloads/csvs")
+    #summarize_trajectories("C:/Users/elabi/Downloads/csvs")
