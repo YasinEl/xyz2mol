@@ -196,7 +196,7 @@ def summarize_singlets(outfile_json, structure_csvs):
 
     with open(outfile_json, 'r') as file:
         data = json.load(file)
-    pprint(data)
+
     csv_files = sorted(list_relevant_csv_files(structure_csvs, parts))
 
     # Prepare a dataframe to hold all combined data

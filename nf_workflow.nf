@@ -35,7 +35,6 @@ process ExtractTar {
     """
 }
 
-
 process RenameFiles {
     input:
     path inputDir
@@ -90,7 +89,6 @@ process ConvertXYZtoCSV {
     """
 }
 
-
 process ParseOutFiles {
 
     conda "$TOOL_FOLDER/requirements.yml"
@@ -115,8 +113,6 @@ process ParseOutFiles {
     """
 }
 
-
-
 process SummarizeTrajectories {
 
     conda "$TOOL_FOLDER/requirements.yml"
@@ -138,18 +134,17 @@ process SummarizeTrajectories {
     """
 }
 
-
 process SummarizeSinglets {
 
     conda "$TOOL_FOLDER/requirements.yml"
 
-    publishDir "./summary_csvs", mode: 'copy'
+    // publishDir "./summary_csvs", mode: 'copy' 
 
     input:
     // path inputDir  // Directly specify the directory
     val toolFolder
     val csvfiles
-    val outFiles
+    each outFiles
 
     output:
     path "*.csv", emit: csvFile, optional: true
@@ -157,7 +152,7 @@ process SummarizeSinglets {
     script:
     """
     mkdir -p summary_csvs
-    python3 $toolFolder/summarize_trajectories.py --input "${workflow.launchDir}/${params.csv_root_dir}"
+    python3 $toolFolder/summarize_singlets.py --input_json "$outFiles" --input_csvs "${workflow.launchDir}/${params.csv_root_dir}"
     """
 }
 
@@ -170,10 +165,10 @@ workflow {
     extractedFiles = ExtractTar(tarFiles)
     renamedFiles = RenameFiles(extractedFiles, TOOL_FOLDER)
     directoryFiles = AddDirectoryToNames(renamedFiles, TOOL_FOLDER)
-    outFiles = ParseOutFiles(TOOL_FOLDER, directoryFiles).outfile
+    outFiles = ParseOutFiles(TOOL_FOLDER, directoryFiles).jsonFile
     csvFiles = ConvertXYZtoCSV(directoryFiles, TOOL_FOLDER).csvFile
     SummarizeTrajectories(TOOL_FOLDER, csvFiles.collect())
-    SummarizeSinglets(TOOL_FOLDER, csvFiles.collect(), outFiles.collect())
+    op= SummarizeSinglets(TOOL_FOLDER, csvFiles.collect(), outFiles.collect())
 }
 
 
