@@ -4,6 +4,7 @@ from rdkit import Chem, rdBase
 from xyz2mol import *
 import re
 import os
+import json
 import numpy as np
 
 def parse_out_file(filename):
@@ -83,8 +84,6 @@ def parse_out_file(filename):
     return parsed_data
 
 
-
-
 if __name__ == "__main__":
     #import cProfile
     #profiler = cProfile.Profile()
@@ -98,8 +97,12 @@ if __name__ == "__main__":
     parser.add_argument('--filepath', '-i', type=str, required=True, help='Path to qcxms.out')
     args = parser.parse_args()
 
-    main(args.filepath)
+    if args.filepath.endswith('qcxms.out'):
+        out_dict = parse_out_file(args.filepath)
+        filename = os.path.basename(args.filepath).split(".out")[0]
 
+        with open(filename + '.json', 'w') as file:
+            json.dump(out_dict, file)
 
 
 
