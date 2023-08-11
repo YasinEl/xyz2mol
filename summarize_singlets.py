@@ -7,6 +7,7 @@ from rdkit.Chem import rdMolDescriptors
 import argparse
 import json
 import glob
+from molmass import Formula
 
 
 def SmilesToExactMass(smiles):
@@ -251,9 +252,10 @@ def summarize_singlets(outfile_json, structure_csvs):
                     apply_offset += 1
 
             main_df.at[idx, 'diss time (ps)'] = data[identifier]['fragments']['diss time (ps)'][int(row['Fragment Number']) - 1 + apply_offset]
-            main_df.at[idx, 'formula'] = data[identifier]['fragments']['formula'][int(row['Fragment Number']) - 1  + apply_offset]
-            main_df.at[idx, 'mass'] = data[identifier]['fragments']['mass'][int(row['Fragment Number']) - 1  + apply_offset]
-            main_df.at[idx, 'charge'] = data[identifier]['charges_per_fragment'][int(row['Fragment Number']) - 1  + apply_offset]['charge']
+            main_df.at[idx, 'formula'] = data[identifier]['fragments']['formula'][int(row['Fragment Number']) - 1 + apply_offset]
+            main_df.at[idx, 'mass'] = data[identifier]['fragments']['mass'][int(row['Fragment Number']) - 1 + apply_offset]
+            main_df.at[idx, 'mass_from_formula'] = Formula(data[identifier]['fragments']['formula'][int(row['Fragment Number']) - 1 + apply_offset]).isotope.mass
+            main_df.at[idx, 'charge'] = data[identifier]['charges_per_fragment'][int(row['Fragment Number']) - 1 + apply_offset]['charge']
             # Add other required fields in a similar manner
 
             main_df.to_csv(parts + '__SingletsSummary.csv')
