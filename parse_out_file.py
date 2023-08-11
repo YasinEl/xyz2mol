@@ -103,6 +103,6 @@ if __name__ == "__main__":
         filename = os.path.basename(file_path).split(".out")[0]
 
         with open(filename + '.json', 'w') as file:
-            json.dump(out_dict, file)
+            json.dump(out_dict, file, indent = 4)
 
 
