@@ -97,12 +97,12 @@ if __name__ == "__main__":
     parser.add_argument('--filepath', '-i', type=str, required=True, help='Path to qcxms.out')
     args = parser.parse_args()
 
-    if args.filepath.endswith('qcxms.out'):
-        out_dict = parse_out_file(args.filepath)
-        filename = os.path.basename(args.filepath).split(".out")[0]
+    file_path = args.filepath
+    if file_path.endswith('qcxms.out'):
+        out_dict = parse_out_file(file_path)
+        filename = os.path.basename(file_path).split(".out")[0]
 
         with open(filename + '.json', 'w') as file:
             json.dump(out_dict, file)
-
 
 

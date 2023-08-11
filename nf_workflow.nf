@@ -3,6 +3,7 @@ nextflow.enable.dsl=2
 
 params.download_link = '' // No default download link
 params.csv_root_dir = './csvs' // No default csv root dir
+params.out_root_dir = './out' // No default csv root dir
 params.xyz_root_dir = 'TMPQCXMS'
 
 TOOL_FOLDER = "$baseDir"
@@ -86,12 +87,34 @@ process ConvertXYZtoCSV {
     else
         echo "Not an .xyz file. Skipping..."
     fi
-
-    
-    
-    
     """
 }
+
+
+process ParseOutFiles {
+
+    conda "$TOOL_FOLDER/requirements.yml"
+
+    publishDir "./out", mode: 'copy'
+
+    input:
+    // path inputDir  // Directly specify the directory
+    val toolFolder
+    each outfile
+
+    output:
+    path "*.json", emit: jsonFile, optional: true
+
+    script:
+    """
+    if [[ "$outfile" == *.out ]]; then
+        python3 $toolFolder/parse_out_file.py --filepath "$outfile"
+    else
+        echo "Not an .out file. Skipping..."
+    fi
+    """
+}
+
 
 
 process SummarizeTrajectories {
@@ -116,14 +139,41 @@ process SummarizeTrajectories {
 }
 
 
+process SummarizeSinglets {
+
+    conda "$TOOL_FOLDER/requirements.yml"
+
+    publishDir "./summary_csvs", mode: 'copy'
+
+    input:
+    // path inputDir  // Directly specify the directory
+    val toolFolder
+    val csvfiles
+    val outFiles
+
+    output:
+    path "*.csv", emit: csvFile, optional: true
+
+    script:
+    """
+    mkdir -p summary_csvs
+    python3 $toolFolder/summarize_trajectories.py --input "${workflow.launchDir}/${params.csv_root_dir}"
+    """
+}
+
+
+
+
 
 workflow {
     tarFiles = DownloadData()
     extractedFiles = ExtractTar(tarFiles)
     renamedFiles = RenameFiles(extractedFiles, TOOL_FOLDER)
     directoryFiles = AddDirectoryToNames(renamedFiles, TOOL_FOLDER)
+    outFiles = ParseOutFiles(TOOL_FOLDER, directoryFiles).outfile
     csvFiles = ConvertXYZtoCSV(directoryFiles, TOOL_FOLDER).csvFile
     SummarizeTrajectories(TOOL_FOLDER, csvFiles.collect())
+    SummarizeSinglets(TOOL_FOLDER, csvFiles.collect(), outFiles.collect())
 }
 
 
