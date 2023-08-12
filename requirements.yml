@@ -4,3 +4,5 @@ dependencies:
   - rdkit::rdkit
   - networkx
   - pip
+  - pip:
+    - molmass

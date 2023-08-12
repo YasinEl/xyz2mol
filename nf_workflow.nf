@@ -138,7 +138,7 @@ process SummarizeSinglets {
 
     conda "$TOOL_FOLDER/requirements.yml"
 
-    // publishDir "./summary_csvs", mode: 'copy' 
+    publishDir "./singlet_csvs", mode: 'copy' 
 
     input:
     // path inputDir  // Directly specify the directory
@@ -151,7 +151,6 @@ process SummarizeSinglets {
 
     script:
     """
-    mkdir -p summary_csvs
     python3 $toolFolder/summarize_singlets.py --input_json "$outFiles" --input_csvs "${workflow.launchDir}/${params.csv_root_dir}"
     """
 }
