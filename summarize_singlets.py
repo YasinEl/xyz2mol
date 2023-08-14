@@ -122,33 +122,23 @@ if __name__ == "__main__":
     df.to_csv(trj_name + '__SingletsSummary.csv', index=False)
 
     #get edges table
-    #df_edges = df[['SMILES']]
-    #df_edges['target'] = df_edges['SMILES'].shift(-1)
-    #df_edges['source'] = df_edges['SMILES']
     df_edges = pd.DataFrame(columns=['source', 'target'])
 
+    prec = None
+    prod = None
     for index, row in df.iterrows():
-        # Find the nearest preceding row with nominal_charge = 1
-        # and a different Run-Number or Collision value.
-        preceding_rows = df.iloc[:index]
-        matching_rows = preceding_rows[(preceding_rows['nominal_charge'] == 1) & 
-                                    ((preceding_rows['Run-Number'] < row['Run-Number']) |
-                                        (preceding_rows['Collision'] < row['Collision']))]
-        
-        if not matching_rows.empty:
-            source_smiles = matching_rows.iloc[-1]['SMILES']
+        if prec is None or (row['nominal_charge'] == 1 and row['SMILES'] in df_edges['target']):
+            prec = row['SMILES']
+        if row['SMILES'] != prec and row['SMILES'] not in df_edges['target']:
+            prod = row['SMILES']
+
+        if len(df_edges[(df_edges['source'] == prec) & (df_edges['target'] == prod)]) == 0:
             df_edges = df_edges.append({
-                'source': source_smiles,
-                'target': row['SMILES']
+                'source': prec,
+                'target': prod
             }, ignore_index=True)
 
 
-
-    df_edges = df_edges[df_edges['source'] != df_edges['target']]
-    df_edges.dropna(subset=['source', 'target'], inplace=True)
-    df_edges = df_edges.drop_duplicates(subset='target', keep='last')
-
-    df_edges = df_edges[['source', 'target']]
 
     if len(df_edges) > 0:
         df_edges.to_csv(trj_name + '__SingletsEdges.csv', index=False)
