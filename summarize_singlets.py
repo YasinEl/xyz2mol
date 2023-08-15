@@ -101,9 +101,11 @@ def summarize_singlets(outfile_json, structure_csvs):
             main_df.at[idx, 'mass'] = data[identifier]['fragments']['mass'][row['Fragment Number'] - 1 + apply_offset]
             main_df.at[idx, 'mass_from_formula'] = Formula(data[identifier]['fragments']['formula'][row['Fragment Number'] - 1 + apply_offset] + "+").isotope.mass
             main_df.at[idx, 'charge'] = data[identifier]['charges_per_fragment'][row['Fragment Number'] - 1 + apply_offset]['charge']
+            main_df.at[idx, 'nominal_charge'] = 1 if data[identifier]['charges_per_fragment'][row['Fragment Number'] - 1 + apply_offset]['used'] == True else 0
+
             # Add other required fields in a similar manner
 
-    main_df['nominal_charge'] = main_df.groupby(['Collision', 'Run-Number'])['charge'].transform(lambda x: x == x.max()).astype(int)
+    #main_df['nominal_charge'] = main_df.groupby(['Collision', 'Run-Number'])['charge'].transform(lambda x: x == x.max()).astype(int)
     main_df.loc[main_df['Source CSV'].str.contains('start.csv'), 'nominal_charge'] = 1
 
     return main_df, parts
