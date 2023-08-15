@@ -17,6 +17,8 @@ def get_decimal_places(num):
 
 def round_to_smaller_decimal_places(num1, num2):
     """Rounds both numbers to the smallest number of decimal places between them."""
+    num1 = float(num1)
+    num2 = float(num2)
     places = min(get_decimal_places(num1), get_decimal_places(num2))
     return round(num1, places), round(num2, places)
 
@@ -27,7 +29,7 @@ def parse_out_file(filename):
     reading_charges = False
     reading_fragments = False
     current_line = None
-    previous_key = None
+    used_keys = []
     with open(filename, 'r') as f:
         lines = f.readlines()
         for i in range(len(lines)):
@@ -35,7 +37,10 @@ def parse_out_file(filename):
             current_line = lines[i].strip()
             previous_line = lines[i - 1].strip() if i - 1 > 0 else None
             next_line = lines[i+1].strip() if i+1 < len(lines) else None
-            previous_key = current_key
+
+            if current_key not in used_keys and current_key is not None:
+                used_keys.append(current_key)
+
 
             if current_line:  # only process line if it's not empty
                 if "Heating  trajectory" in current_line:
@@ -96,9 +101,9 @@ def parse_out_file(filename):
                             else:
                                 parsed_data[current_key]["fragments"][key].append(data[i])
 
-                elif ' statistical charge    ' in current_line and previous_key is not None:
+                if 'statistical charge' in current_line and len(used_keys) > 1:
+                    previous_key = used_keys[-2]
                     extracted_value = current_line.split()[-1]
-
                     for item in parsed_data[previous_key]["charges_per_fragment"]:
                         rounded_charge, rounded_extracted = round_to_smaller_decimal_places(item['charge'],
                                                                                             extracted_value)
@@ -124,6 +129,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     file_path = args.filepath
+
+
     if file_path.endswith('qcxms.out'):
         out_dict = parse_out_file(file_path)
         filename = os.path.basename(file_path).split(".out")[0]
