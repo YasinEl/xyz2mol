@@ -7,13 +7,27 @@ import os
 import json
 import numpy as np
 
+
+def get_decimal_places(num):
+    """Returns the number of decimal places in a number."""
+    s = str(num)
+    if '.' in s:
+        return len(s) - s.index('.') - 1
+    return 0
+
+def round_to_smaller_decimal_places(num1, num2):
+    """Rounds both numbers to the smallest number of decimal places between them."""
+    places = min(get_decimal_places(num1), get_decimal_places(num2))
+    return round(num1, places), round(num2, places)
+
+
 def parse_out_file(filename):
     parsed_data = {}
     current_key = None
     reading_charges = False
     reading_fragments = False
     current_line = None
-
+    previous_key = None
     with open(filename, 'r') as f:
         lines = f.readlines()
         for i in range(len(lines)):
@@ -21,6 +35,7 @@ def parse_out_file(filename):
             current_line = lines[i].strip()
             previous_line = lines[i - 1].strip() if i - 1 > 0 else None
             next_line = lines[i+1].strip() if i+1 < len(lines) else None
+            previous_key = current_key
 
             if current_line:  # only process line if it's not empty
                 if "Heating  trajectory" in current_line:
@@ -64,12 +79,12 @@ def parse_out_file(filename):
                     # If not, we've reached the end of the "Summed charges per fragment" section.
                     try:
                         fragment_id = int(fragment_id)
-                        charge = float(charge)
+                        charge = charge
                     except ValueError:
                         reading_charges = False
                         continue
 
-                    parsed_data[current_key]["charges_per_fragment"].append({"id": fragment_id, "charge": charge})
+                    parsed_data[current_key]["charges_per_fragment"].append({"id": fragment_id, "charge": charge, "used": False})
                 elif reading_fragments:
                     data = current_line.split()
                     if current_line.startswith('M='):
@@ -80,6 +95,17 @@ def parse_out_file(filename):
                                 parsed_data[current_key]["fragments"][key] = [data[i]]
                             else:
                                 parsed_data[current_key]["fragments"][key].append(data[i])
+
+                elif ' statistical charge    ' in current_line and previous_key is not None:
+                    extracted_value = current_line.split()[-1]
+
+                    for item in parsed_data[previous_key]["charges_per_fragment"]:
+                        rounded_charge, rounded_extracted = round_to_smaller_decimal_places(item['charge'],
+                                                                                            extracted_value)
+                        if rounded_charge == rounded_extracted:
+                            item['used'] = True
+
+
 
     return parsed_data
 
