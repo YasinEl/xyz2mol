@@ -129,12 +129,12 @@ if __name__ == "__main__":
     prec = None
     prod = None
     for index, row in df.iterrows():
-        if prec is None or (row['nominal_charge'] == 1 and row['SMILES'] in df_edges['target']):
+        if prec is None or (row['nominal_charge'] == 1 and row['SMILES'] in df_edges['target']): #this needs to be fixed!
             prec = row['SMILES']
         if row['SMILES'] != prec and row['SMILES'] not in df_edges['target']:
             prod = row['SMILES']
 
-        if len(df_edges[(df_edges['source'] == prec) & (df_edges['target'] == prod)]) == 0:
+        if len(df_edges[(df_edges['source'] == prec) & (df_edges['target'] == prod)]) == 0 and not prod is None:
             df_edges = df_edges.append({
                 'source': prec,
                 'target': prod
