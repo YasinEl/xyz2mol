@@ -128,19 +128,26 @@ if __name__ == "__main__":
 
     prec = None
     prod = None
+    next_prec = None
+
     for index, row in df.iterrows():
-        if prec is None or (row['nominal_charge'] == 1 and row['SMILES'] in df_edges['target']): #this needs to be fixed!
-            prec = row['SMILES']
-        if row['SMILES'] != prec and row['SMILES'] not in df_edges['target']:
+
+        if prec is None or (row['nominal_charge'] == 1 and prec != row['SMILES']):
+            next_prec = row['SMILES']
+
+        if prec is None or next_prec in df_edges['target'].values:
+            prec = next_prec
+
+        current_smiles = row['SMILES']
+        if row['SMILES'] != prec:
             prod = row['SMILES']
 
         if len(df_edges[(df_edges['source'] == prec) & (df_edges['target'] == prod)]) == 0 and not prod is None:
-            df_edges = df_edges.append({
-                'source': prec,
-                'target': prod
-            }, ignore_index=True)
-
-
+            new_row = pd.DataFrame({
+                'source': [prec],
+                'target': [prod]
+            })
+            df_edges = pd.concat([df_edges, new_row], ignore_index=True)
 
     if len(df_edges) > 0:
         df_edges.to_csv(trj_name + '__SingletsEdges.csv', index=False)
