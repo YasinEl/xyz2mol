@@ -111,6 +111,10 @@ def parse_out_file(filename):
                             item['used'] = True
 
 
+    #assign last nominal charge
+    max_index = max(enumerate(parsed_data[previous_key]["charges_per_fragment"]), key=lambda x: float(x[1]["charge"]))[0]
+    parsed_data[previous_key]["charges_per_fragment"][max_index]['used'] = True
+
 
     return parsed_data
 
