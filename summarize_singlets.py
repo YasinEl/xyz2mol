@@ -66,8 +66,6 @@ def summarize_singlets(outfile_json, structure_csvs):
 
     # Add information from json based on the csv filename
     for idx, row in main_df.iterrows():
-        apply_offset = 0
-        add_trj_offset = 0
         identifier = ""
         if row['Collision'] == 0:
             identifier = "heating_trajectory" + str(row['Run-Number'])
@@ -87,12 +85,12 @@ def summarize_singlets(outfile_json, structure_csvs):
         # Check if the ID matches
         if row['Fragment Number'] in [charge['id'] for charge in data[identifier]['charges_per_fragment']]:
 
-            main_df.at[idx, 'diss time (ps)'] = data[identifier]['fragments']['diss time (ps)'][row['Fragment Number'] - 1 + apply_offset]
-            main_df.at[idx, 'formula'] = data[identifier]['fragments']['formula'][row['Fragment Number'] - 1 + apply_offset]
-            main_df.at[idx, 'mass'] = data[identifier]['fragments']['mass'][row['Fragment Number'] - 1 + apply_offset]
-            main_df.at[idx, 'mass_from_formula'] = Formula(data[identifier]['fragments']['formula'][row['Fragment Number'] - 1 + apply_offset] + "+").isotope.mass
-            main_df.at[idx, 'charge'] = data[identifier]['charges_per_fragment'][row['Fragment Number'] - 1 + apply_offset]['charge']
-            main_df.at[idx, 'nominal_charge'] = 1 if data[identifier]['charges_per_fragment'][row['Fragment Number'] - 1 + apply_offset]['used'] == True else 0
+            main_df.at[idx, 'diss time (ps)'] = data[identifier]['fragments']['diss time (ps)'][row['Fragment Number'] - 1]
+            main_df.at[idx, 'formula'] = data[identifier]['fragments']['formula'][row['Fragment Number'] - 1]
+            main_df.at[idx, 'mass'] = data[identifier]['fragments']['mass'][row['Fragment Number'] - 1]
+            main_df.at[idx, 'mass_from_formula'] = Formula(data[identifier]['fragments']['formula'][row['Fragment Number'] - 1] + "+").isotope.mass
+            main_df.at[idx, 'charge'] = data[identifier]['charges_per_fragment'][row['Fragment Number'] - 1]['charge']
+            main_df.at[idx, 'nominal_charge'] = 1 if data[identifier]['charges_per_fragment'][row['Fragment Number'] - 1]['used'] == True else 0
 
             # Add other required fields in a similar manner
 
