@@ -48,10 +48,11 @@ def parse_out_file(filename):
                         len([k for k in parsed_data.keys() if k.startswith('heating_trajectory')]) + 1)
                     parsed_data[current_key] = {"charges_per_fragment": [], "fragments": {}, "step": []}
                 elif "trajectory" in current_line and "collision" in current_line:
-                    current_key = "CID" + str(len([k for k in parsed_data.keys() if k.startswith('CID')]) + 1)
+                    current_id = str(len([k for k in parsed_data.keys() if k.startswith('CID')]) + 1)
+                    current_key = "CID" + current_id
                     parsed_data[current_key] = {"charges_per_fragment": [], "fragments": {}, "step": []}
-                elif "- Entering Mean-Free-Path simulation -" in current_line:
-                    current_key = "MD" + str(len([k for k in parsed_data.keys() if k.startswith('MD')]) + 1)
+                elif "MFP traj." in current_line:
+                    current_key = "MD" + current_id + '_' + current_line[-1]
                     parsed_data[current_key] = {"charges_per_fragment": [], "fragments": {}, "step": []}
 
                 if "FRAGMENTATION occured!" in current_line:
@@ -113,7 +114,11 @@ def parse_out_file(filename):
 
     #assign last nominal charge
     max_index = max(enumerate(parsed_data[current_key]["charges_per_fragment"]), key=lambda x: float(x[1]["charge"]))[0]
-    parsed_data[current_key]["charges_per_fragment"][max_index]['used'] = True
+    len_index = len(parsed_data[current_key]["charges_per_fragment"])
+    if len_index > 1:
+        parsed_data[current_key]["charges_per_fragment"][max_index]['used'] = True
+    else:
+        parsed_data[current_key]["charges_per_fragment"][0]['used'] = True
 
 
     return parsed_data

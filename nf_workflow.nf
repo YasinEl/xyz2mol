@@ -147,7 +147,7 @@ process SummarizeSinglets {
     each outFiles
 
     output:
-    path "*.csv", emit: csvFile, optional: true
+    path "*.csv", emit: csvFile, optional: false
 
     script:
     """

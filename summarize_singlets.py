@@ -74,9 +74,8 @@ def summarize_singlets(outfile_json, structure_csvs):
         elif row['Run-Number'] == 1:
             identifier = "CID" + str(row['Collision'])
         elif row['Run-Number'] > 1:
-            identifier = "MD" + str(row['Collision'])
-            if row['Run-Number'] > 2:
-                add_trj_offset = row['Run-Number'] - 1
+            identifier = "MD" + str(row['Collision']) + '_' + str(row['Run-Number'] - 1)
+
         else:
             continue
 
@@ -87,14 +86,6 @@ def summarize_singlets(outfile_json, structure_csvs):
 
         # Check if the ID matches
         if row['Fragment Number'] in [charge['id'] for charge in data[identifier]['charges_per_fragment']]:
-            if add_trj_offset > 0:
-                count_id1 = 0
-                for idx2, item in enumerate(data[identifier]['charges_per_fragment']):
-                    if item['id'] == 1:
-                        count_id1 += 1
-                    if count_id1 == add_trj_offset:
-                        break
-                    apply_offset += 1
 
             main_df.at[idx, 'diss time (ps)'] = data[identifier]['fragments']['diss time (ps)'][row['Fragment Number'] - 1 + apply_offset]
             main_df.at[idx, 'formula'] = data[identifier]['fragments']['formula'][row['Fragment Number'] - 1 + apply_offset]
@@ -132,22 +123,28 @@ if __name__ == "__main__":
 
     for index, row in df.iterrows():
 
-        if prec is None or (row['nominal_charge'] == 1 and prec != row['SMILES']):
+        if prec is None:
             next_prec = row['SMILES']
 
-        if prec is None or next_prec in df_edges['target'].values:
+        if prec is None or (row['Collision'] > current_col or row['Run-Number'] > current_run):
             prec = next_prec
 
         current_smiles = row['SMILES']
         if row['SMILES'] != prec:
             prod = row['SMILES']
 
-        if len(df_edges[(df_edges['source'] == prec) & (df_edges['target'] == prod)]) == 0 and not prod is None:
+        if len(df_edges[(df_edges['source'] == prec) & (df_edges['target'] == prod)]) == 0 and not prod is None and prec != prod:
             new_row = pd.DataFrame({
                 'source': [prec],
                 'target': [prod]
             })
             df_edges = pd.concat([df_edges, new_row], ignore_index=True)
+
+        if prec is None or row['nominal_charge'] == 1:
+            current_col = row['Collision']
+            current_run = row['Run-Number']
+            next_prec = row['SMILES']
+
 
     if len(df_edges) > 0:
         df_edges.to_csv(trj_name + '__SingletsEdges.csv', index=False)
