@@ -1,16 +1,20 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
-params.download_link = '' // No default download link
+//params.download_link = '' // No default download link
 params.csv_root_dir = './csvs' // No default csv root dir
 params.out_root_dir = './out' // No default csv root dir
 params.xyz_root_dir = 'TMPQCXMS'
+params.download_links = ""
+download_links_list = params.download_links.split(',')
+download_links_channel = Channel.from(download_links_list)
+download_links_channel.view()
 
 TOOL_FOLDER = "$baseDir"
 
 process DownloadData {
-    when:
-    params.download_link != ''
+    input:
+    each link
 
     output:
     path("tar_files/*"), emit: tarFile
@@ -18,27 +22,31 @@ process DownloadData {
     script:
     """
     mkdir -p tar_files
-    wget -P tar_files ${params.download_link}
+    wget -P tar_files $link
     """
 }
 
 process ExtractTar {
     input:
-    path tar_file 
+    each tar_files
 
     output:
-    path("${params.xyz_root_dir}"), emit: extractedFiles
+    path "TMPQCXMS_${tar_files.baseName}/*", emit: extractedFiles
+    // path "TMPQCXMS_*/*", emit: extractedFiles
 
-    script:
     """
-    tar -xf ${tar_file} -C .
+    tar -xf ${tar_files} -C .
+    mv ./TMPQCXMS ./TMPQCXMS_${tar_files.baseName}
     """
 }
+
+
 
 process RenameFiles {
     input:
     path inputDir
     val toolFolder
+
 
     output:
     path("${inputDir}"), emit: renamedFiles
@@ -64,9 +72,11 @@ process AddDirectoryToNames {
 }
 
 process ConvertXYZtoCSV {
+    
     conda "$TOOL_FOLDER/requirements.yml"
 
     publishDir "./csvs", mode: 'copy'
+    //errorStrategy 'ignore'
 
     input:
     each xyz_file 
@@ -147,7 +157,7 @@ process SummarizeSinglets {
     each outFiles
 
     output:
-    path "*.csv", emit: csvFile, optional: false
+    path "*.csv", emit: csvFile, optional: true
 
     script:
     """
@@ -160,12 +170,13 @@ process SummarizeSinglets {
 
 
 workflow {
-    tarFiles = DownloadData()
-    extractedFiles = ExtractTar(tarFiles)
-    renamedFiles = RenameFiles(extractedFiles, TOOL_FOLDER)
-    directoryFiles = AddDirectoryToNames(renamedFiles, TOOL_FOLDER)
-    outFiles = ParseOutFiles(TOOL_FOLDER, directoryFiles).jsonFile
-    csvFiles = ConvertXYZtoCSV(directoryFiles, TOOL_FOLDER).csvFile
+    download_links_channel
+    tarFiles = DownloadData(download_links_channel)
+    ExtractTar(tarFiles)
+    RenameFiles(ExtractTar.out.extractedFiles.collect().flatten(), TOOL_FOLDER)
+    directoryFiles = AddDirectoryToNames(RenameFiles.out.renamedFiles.collect().flatten(), TOOL_FOLDER)
+    outFiles = ParseOutFiles(TOOL_FOLDER, AddDirectoryToNames.out.renamedFiles.collect().flatten()).jsonFile   
+    csvFiles = ConvertXYZtoCSV(AddDirectoryToNames.out.renamedFiles.collect().flatten(), TOOL_FOLDER).csvFile
     SummarizeTrajectories(TOOL_FOLDER, csvFiles.collect())
     op= SummarizeSinglets(TOOL_FOLDER, csvFiles.collect(), outFiles.collect())
 }

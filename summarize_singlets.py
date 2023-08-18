@@ -37,8 +37,15 @@ def summarize_singlets(outfile_json, structure_csvs):
     with open(outfile_json, 'r') as file:
         data = json.load(file)
 
+    if data['status'] == 'failed':
+        return 'failed', 'failed'
+
     csv_files = list_relevant_csv_files(structure_csvs, parts)
 
+
+    if len(csv_files) == 0:
+        return 'failed', 'failed'
+    
     # Prepare a dataframe to hold all combined data
     df_list = []
 
@@ -108,42 +115,45 @@ if __name__ == "__main__":
     parser.add_argument('--input_csvs', '-ic', type=str, required=True, help='Path to csv files')
     args = parser.parse_args()
 
+
     df, trj_name = summarize_singlets(args.input_json, args.input_csvs)
 
-    df.to_csv(trj_name + '__SingletsSummary.csv', index=False)
+    if trj_name != 'failed':
 
-    #get edges table
-    df_edges = pd.DataFrame(columns=['source', 'target'])
+        df.to_csv(trj_name + '__SingletsSummary.csv', index=False)
 
-    prec = None
-    prod = None
-    next_prec = None
+        #get edges table
+        df_edges = pd.DataFrame(columns=['source', 'target'])
 
-    for index, row in df.iterrows():
+        prec = None
+        prod = None
+        next_prec = None
 
-        if prec is None:
-            next_prec = row['SMILES']
+        for index, row in df.iterrows():
 
-        if prec is None or (row['Collision'] > current_col or row['Run-Number'] > current_run):
-            prec = next_prec
+            if prec is None:
+                next_prec = row['SMILES']
 
-        current_smiles = row['SMILES']
-        if row['SMILES'] != prec:
-            prod = row['SMILES']
+            if prec is None or (row['Collision'] > current_col or row['Run-Number'] > current_run):
+                prec = next_prec
 
-        if len(df_edges[(df_edges['source'] == prec) & (df_edges['target'] == prod)]) == 0 and not prod is None and prec != prod:
-            new_row = pd.DataFrame({
-                'source': [prec],
-                'target': [prod]
-            })
-            df_edges = pd.concat([df_edges, new_row], ignore_index=True)
+            current_smiles = row['SMILES']
+            if row['SMILES'] != prec:
+                prod = row['SMILES']
 
-        if prec is None or row['nominal_charge'] == 1:
-            current_col = row['Collision']
-            current_run = row['Run-Number']
-            next_prec = row['SMILES']
+            if len(df_edges[(df_edges['source'] == prec) & (df_edges['target'] == prod)]) == 0 and not prod is None and prec != prod:
+                new_row = pd.DataFrame({
+                    'source': [prec],
+                    'target': [prod]
+                })
+                df_edges = pd.concat([df_edges, new_row], ignore_index=True)
+
+            if prec is None or row['nominal_charge'] == 1:
+                current_col = row['Collision']
+                current_run = row['Run-Number']
+                next_prec = row['SMILES']
 
 
-    if len(df_edges) > 0:
-        df_edges.to_csv(trj_name + '__SingletsEdges.csv', index=False)
+        if len(df_edges) > 0:
+            df_edges.to_csv(trj_name + '__SingletsEdges.csv', index=False)
 
