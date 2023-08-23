@@ -104,6 +104,11 @@ def summarize_singlets(outfile_json, structure_csvs):
     #main_df['nominal_charge'] = main_df.groupby(['Collision', 'Run-Number'])['charge'].transform(lambda x: x == x.max()).astype(int)
     main_df.loc[main_df['Source CSV'].str.contains('start.csv'), 'nominal_charge'] = 1
 
+    main_df['Collision'] = pd.to_numeric(main_df['Collision'], errors='coerce')
+    main_df['Run-Number'] = pd.to_numeric(main_df['Run-Number'], errors='coerce')
+
+    main_df = main_df.sort_values(by=['Collision', 'Run-Number'])
+
     return main_df, parts
 
 
