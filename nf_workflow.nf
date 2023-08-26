@@ -173,7 +173,26 @@ process SummarizeSinglets {
     """
 }
 
+process CreateNetworkBase {
+    cache 'lenient'
 
+    conda "$TOOL_FOLDER/requirements.yml"
+
+    publishDir "./summary_csvs", mode: 'copy' 
+
+    input:
+    // path inputDir  // Directly specify the directory
+    val toolFolder
+    val csvfiles
+
+    output:
+    path "*.csv", emit: csvFile, optional: true
+
+    script:
+    """
+    python3 $toolFolder/summarize_network.py --input_path "${workflow.launchDir}/singlet_csvs"
+    """
+}
 
  workflow {
      download_links_channel
@@ -183,7 +202,8 @@ process SummarizeSinglets {
      renamed_files = AddDirectoryToNames(RenameFiles.out.renamedFiles.collect().map{ it.sort{ a, b -> a.toString() <=> b.toString() } }.flatten(), TOOL_FOLDER)
      outFiles = ParseOutFiles(TOOL_FOLDER, renamed_files.collect()).jsonFile   
      csvFiles = ConvertXYZtoCSV(AddDirectoryToNames.out.renamedFiles.collect().map{ it.sort{ a, b -> a.toString() <=> b.toString() } }.flatten(), TOOL_FOLDER).csvFile
-     network_data = SummarizeSinglets(TOOL_FOLDER, csvFiles.collect(), ParseOutFiles.out.jsonFile.collect())
+     singlets = SummarizeSinglets(TOOL_FOLDER, csvFiles.collect(), ParseOutFiles.out.jsonFile.collect()).csvFile
+     network_data = CreateNetworkBase(TOOL_FOLDER, singlets.collect())
  }
 
 
