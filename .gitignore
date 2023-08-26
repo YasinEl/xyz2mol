@@ -109,3 +109,5 @@ env_xyz2mol/
 *.xyz
 
 my_env
+
+.idea
