@@ -104,10 +104,7 @@ def summarize_singlets(outfile_json, structure_csvs):
     #main_df['nominal_charge'] = main_df.groupby(['Collision', 'Run-Number'])['charge'].transform(lambda x: x == x.max()).astype(int)
     main_df.loc[main_df['Source CSV'].str.contains('start.csv'), 'nominal_charge'] = 1
 
-    main_df['Collision'] = pd.to_numeric(main_df['Collision'], errors='coerce')
-    main_df['Run-Number'] = pd.to_numeric(main_df['Run-Number'], errors='coerce')
-
-    main_df = main_df.sort_values(by=['Collision', 'Run-Number'])
+    main_df = main_df.sort_values(by=['Collision', 'Run-Number', 'nominal_charge'], ascending=[True, True, True])
 
     return main_df, parts
 
@@ -153,9 +150,12 @@ if __name__ == "__main__":
                 })
                 df_edges = pd.concat([df_edges, new_row], ignore_index=True)
 
+            current_col = row['Collision']
+            current_run = row['Run-Number']           
+
             if prec is None or row['nominal_charge'] == 1:
-                current_col = row['Collision']
-                current_run = row['Run-Number']
+                #current_col_prec = row['Collision']
+                #current_run_prec = row['Run-Number']
                 next_prec = row['SMILES']
 
 

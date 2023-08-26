@@ -43,6 +43,8 @@ process ExtractTar {
 
 
 process RenameFiles {
+    cache 'lenient'
+
     input:
     path inputDir
     val toolFolder
@@ -58,6 +60,8 @@ process RenameFiles {
 }
 
 process AddDirectoryToNames {
+    cache 'lenient'
+
     input:
     path inputDir
     val toolFolder
@@ -72,6 +76,7 @@ process AddDirectoryToNames {
 }
 
 process ConvertXYZtoCSV {
+    cache 'lenient'
     
     conda "$TOOL_FOLDER/requirements.yml"
 
@@ -91,7 +96,7 @@ process ConvertXYZtoCSV {
 
 
     # Check if the file has a .xyz extension
-    if [[ "$xyz_file" == *.xyz ]]; then
+    if [[ "$xyz_file" == *.xyz  && "$xyz_file" != *CID* && "$xyz_file" != *MDtrj* ]]; then
         python3 $toolFolder/main.py -xyz "$xyz_file" -csv "\$csv_file"
     else
         echo "Not an .xyz file. Skipping..."
@@ -100,10 +105,11 @@ process ConvertXYZtoCSV {
 }
 
 process ParseOutFiles {
+    cache 'lenient'
 
     conda "$TOOL_FOLDER/requirements.yml"
 
-    publishDir "./out", mode: 'copy'
+    // publishDir "./out", mode: 'symlink'
 
     input:
     // path inputDir  // Directly specify the directory
@@ -124,10 +130,11 @@ process ParseOutFiles {
 }
 
 process SummarizeTrajectories {
+    cache 'lenient'
 
     conda "$TOOL_FOLDER/requirements.yml"
 
-    publishDir "./summary_csvs", mode: 'copy'
+    publishDir "./summary_csvs", mode: 'symlink'
 
     input:
     // path inputDir  // Directly specify the directory
@@ -145,6 +152,7 @@ process SummarizeTrajectories {
 }
 
 process SummarizeSinglets {
+    cache 'lenient'
 
     conda "$TOOL_FOLDER/requirements.yml"
 
@@ -167,19 +175,16 @@ process SummarizeSinglets {
 
 
 
-
-
-workflow {
-    download_links_channel
-    tarFiles = DownloadData(download_links_channel)
-    ExtractTar(tarFiles)
-    RenameFiles(ExtractTar.out.extractedFiles.collect().flatten(), TOOL_FOLDER)
-    directoryFiles = AddDirectoryToNames(RenameFiles.out.renamedFiles.collect().flatten(), TOOL_FOLDER)
-    outFiles = ParseOutFiles(TOOL_FOLDER, AddDirectoryToNames.out.renamedFiles.collect().flatten()).jsonFile   
-    csvFiles = ConvertXYZtoCSV(AddDirectoryToNames.out.renamedFiles.collect().flatten(), TOOL_FOLDER).csvFile
-    SummarizeTrajectories(TOOL_FOLDER, csvFiles.collect())
-    op= SummarizeSinglets(TOOL_FOLDER, csvFiles.collect(), outFiles.collect())
-}
+ workflow {
+     download_links_channel
+     tarFiles = DownloadData(download_links_channel)
+     ExtractTar(tarFiles)
+     RenameFiles(ExtractTar.out.extractedFiles.collect().map{ it.sort{ a, b -> a.toString() <=> b.toString() } }.flatten(), TOOL_FOLDER)
+     renamed_files = AddDirectoryToNames(RenameFiles.out.renamedFiles.collect().map{ it.sort{ a, b -> a.toString() <=> b.toString() } }.flatten(), TOOL_FOLDER)
+     outFiles = ParseOutFiles(TOOL_FOLDER, renamed_files.collect()).jsonFile   
+     csvFiles = ConvertXYZtoCSV(AddDirectoryToNames.out.renamedFiles.collect().map{ it.sort{ a, b -> a.toString() <=> b.toString() } }.flatten(), TOOL_FOLDER).csvFile
+     network_data = SummarizeSinglets(TOOL_FOLDER, csvFiles.collect(), ParseOutFiles.out.jsonFile.collect())
+ }
 
 
 
